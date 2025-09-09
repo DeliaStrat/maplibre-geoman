@@ -26,7 +26,7 @@ import {
   type ShapeName,
   type SourcesStorage,
 } from '@/main.ts';
-import { fixGeoJsonFeature } from '@/utils/features.ts';
+import { exportFeature, fixGeoJsonFeature } from '@/utils/features.ts';
 import { getGeoJsonBounds } from '@/utils/geojson.ts';
 import { isMapPointerEvent } from '@/utils/guards/map.ts';
 import { includesWithType, typedKeys, typedValues } from '@/utils/typing.ts';
@@ -363,10 +363,7 @@ export class Features {
             }
 
             if (shapeTypes === undefined || shapeTypes.includes(featureData.shape)) {
-              resultFeatureCollection.features.push({
-                ...feature,
-                id: feature.properties[FEATURE_ID_PROPERTY],
-              });
+              resultFeatureCollection.features.push(exportFeature(feature));
             }
           });
       }

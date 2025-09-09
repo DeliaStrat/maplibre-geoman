@@ -2,10 +2,14 @@ import { FeatureData } from '@/core/features/feature-data.ts';
 import {
   type AnyMapInstance,
   BaseMapAdapter,
+  type BasicGeometry,
+  FEATURE_ID_PROPERTY,
   type GeoJsonImportFeature,
   type GeoJsonShapeFeature,
   type LngLat,
   type LngLatDiff,
+  type ShapeGeoJsonProperties,
+  typedKeys,
 } from '@/main.ts';
 import {
   eachCoordinateWithPath,
@@ -20,6 +24,8 @@ import { cloneDeep } from 'lodash-es';
 import { isLineBasedGeoJsonFeature, isPointBasedGeoJsonFeature } from '../../tests/types.ts';
 import buffer from '@turf/buffer';
 import distance from '@turf/distance';
+import { propertyValidators } from '@/core/features/validators.ts';
+import { FEATURE_PROPERTY_PREFIX } from '@/core/features/constants.ts';
 
 export const moveGeoJson = (geoJson: GeoJsonShapeFeature, lngLatDiff: LngLatDiff) => {
   eachCoordinateWithPath(geoJson, (position) => {
@@ -122,4 +128,24 @@ export const fixGeoJsonFeature = (feature: GeoJsonImportFeature): GeoJsonImportF
   }
 
   return null;
+};
+
+export const exportFeature = (feature: Feature<BasicGeometry, ShapeGeoJsonProperties>) => {
+  const properties = cloneDeep(feature.properties);
+  typedKeys(propertyValidators).forEach((name) => {
+    if (name === 'id') {
+      return;
+    }
+    const value = feature.properties[`${FEATURE_PROPERTY_PREFIX}${name}`];
+    if (typeof value !== 'undefined') {
+      delete properties[`${FEATURE_PROPERTY_PREFIX}${name}`];
+      properties[name] = value;
+    }
+  });
+
+  return {
+    ...feature,
+    id: feature.properties[FEATURE_ID_PROPERTY],
+    properties,
+  };
 };
