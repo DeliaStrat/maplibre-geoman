@@ -274,6 +274,7 @@ export class Features {
       addedFeatures: [] as Array<FeatureData>,
     };
 
+    this.gm.features.updateManager.beginTransaction();
     features.forEach((feature) => {
       let featureData: FeatureData | null = null;
       result.stats.total += 1;
@@ -296,6 +297,7 @@ export class Features {
         result.stats.failed += 1;
       }
     });
+    this.gm.features.updateManager.commit();
 
     return result;
   }
