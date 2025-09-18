@@ -65,7 +65,7 @@ export class SourceUpdateManager {
 
     const source = this.gm.features.sources[sourceName];
     if (source) {
-      console.log('updateData', diff);
+      // console.log('updateData', diff);
       source.updateData(diff);
     }
   }
