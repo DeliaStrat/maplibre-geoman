@@ -3,41 +3,18 @@ import { FEATURE_ID_PROPERTY, type Geoman } from '@/main.ts';
 import type { FeatureSourceName, GeoJsonSourceDiff } from '@/types';
 import { typedKeys, typedValues } from '@/utils/typing.ts';
 import type { Feature } from 'geojson';
-import { debounce, throttle } from 'lodash-es';
 
-type SourceUpdateMethods = {
-  [key in FeatureSourceName]: {
-    debounced: () => void;
-    throttled: () => void;
-  };
-};
 // this class is here cause playwright fails if it's extracted for unknown reason
 // (possible imports trouble)
 export class SourceUpdateManager {
   gm: Geoman;
   updateStorage: { [key in FeatureSourceName]: Array<GeoJsonSourceDiff> };
   autoUpdatesEnabled: boolean = true;
-  delayedSourceUpdateMethods: SourceUpdateMethods;
+  transactionActive: boolean = false;
 
   constructor(gm: Geoman) {
     this.gm = gm;
     this.updateStorage = Object.fromEntries(typedValues(SOURCES).map((name) => [name, []]));
-
-    this.delayedSourceUpdateMethods = Object.fromEntries(
-      typedValues(SOURCES).map((sourceName) => [
-        sourceName,
-        {
-          throttled: this.getDelayedSourceUpdateMethod({
-            sourceName,
-            type: 'throttled',
-          }),
-          debounced: this.getDelayedSourceUpdateMethod({
-            sourceName,
-            type: 'debounced',
-          }),
-        } as { debounced: () => void; throttled: () => void },
-      ]),
-    ) as SourceUpdateMethods;
   }
 
   getFeatureId(feature: Feature) {
@@ -48,37 +25,49 @@ export class SourceUpdateManager {
     return id;
   }
 
-  getDelayedSourceUpdateMethod({
-    sourceName,
-    type,
-  }: {
-    sourceName: FeatureSourceName;
-    type: 'throttled' | 'debounced';
-  }) {
-    if (type === 'throttled') {
-      return throttle(
-        () => this.updateSourceActual(sourceName),
-        this.gm.options.settings.throttlingDelay,
-        { leading: false, trailing: true },
-      );
-    } else if (type === 'debounced') {
-      return debounce(
-        () => this.updateSourceActual(sourceName),
-        this.gm.options.settings.throttlingDelay,
-        { leading: true, trailing: false },
-      );
-    } else {
-      throw new Error('Features: getDelayedSourceUpdateMethod: invalid type');
-    }
+  beginTransaction() {
+    console.log('beginTransaction');
+    this.transactionActive = true;
   }
 
-  updateSource({ sourceName, diff }: { sourceName: FeatureSourceName; diff?: GeoJsonSourceDiff }) {
-    if (diff) {
+  commit() {
+    this.intermediateCommit();
+
+    this.transactionActive = false;
+    console.log('commit');
+  }
+
+  private intermediateCommit() {
+    typedValues(SOURCES).forEach((sourceName) => {
+      const source = this.gm.features.sources[sourceName];
+
+      const updateStorage = this.updateStorage[sourceName];
+      if (!source || updateStorage.length === 0) {
+        return;
+      }
+
+      const combinedDiff = this.getCombinedDiff(sourceName);
+      if (combinedDiff) {
+        // console.log('updateData', combinedDiff);
+        source.updateData(combinedDiff);
+      }
+    });
+  }
+
+  updateSource({ sourceName, diff }: { sourceName: FeatureSourceName; diff: GeoJsonSourceDiff }) {
+    if (this.transactionActive) {
       this.updateStorage[sourceName].push(diff);
+      if (this.updateStorage[sourceName].length > 250) {
+        this.intermediateCommit();
+      }
+      return;
     }
 
-    this.delayedSourceUpdateMethods[sourceName].throttled();
-    this.delayedSourceUpdateMethods[sourceName].debounced();
+    const source = this.gm.features.sources[sourceName];
+    if (source) {
+      // console.log('updateData', diff);
+      source.updateData(diff);
+    }
   }
 
   updateSourceActual(sourceName: FeatureSourceName) {
@@ -88,6 +77,7 @@ export class SourceUpdateManager {
 
       if (source && combinedDiff) {
         // applies non empty diff
+        console.log('apply updateData', combinedDiff);
         source.updateData(combinedDiff);
       }
     }
@@ -99,7 +89,7 @@ export class SourceUpdateManager {
       return callback();
     } finally {
       typedKeys(this.gm.features.sources).forEach((sourceName) => {
-        this.updateSource({ sourceName });
+        this.updateSource({ sourceName, diff: {} });
       });
       this.autoUpdatesEnabled = true;
     }

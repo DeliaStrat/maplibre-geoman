@@ -261,6 +261,9 @@ export class ShapeMarkersHelper extends BaseHelper {
   }
 
   addMarkers() {
+    this.gm.features.updateManager.beginTransaction();
+    console.time('addMarkers forEach');
+
     this.gm.features.forEach((featureData) => {
       if (
         !featureData ||
@@ -301,6 +304,8 @@ export class ShapeMarkersHelper extends BaseHelper {
         }
       });
     });
+    console.timeEnd('addMarkers forEach');
+    this.gm.features.updateManager.commit();
   }
 
   addCenterMarker(featureData: FeatureData) {
@@ -369,6 +374,7 @@ export class ShapeMarkersHelper extends BaseHelper {
   }
 
   removeMarkers() {
+    this.gm.features.updateManager.beginTransaction();
     this.gm.features.forEach((_, featureId) => {
       const featureData = this.gm.features.get(SOURCES.main, featureId);
 
@@ -383,6 +389,7 @@ export class ShapeMarkersHelper extends BaseHelper {
         featureData.markers = new Map();
       }
     });
+    this.gm.features.updateManager.commit();
   }
 
   removeMarker(markerData: MarkerData) {
