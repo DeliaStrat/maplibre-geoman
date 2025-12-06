@@ -9,17 +9,23 @@ type SourceUpdateMethods = {
   [key in FeatureSourceName]: () => void;
 };
 
-const MAX_DIFF_ITEMS = 5000;
+type UpdateMethod = 'automatic' | 'transactional-update' | 'transactional-set';
 
 export class SourceUpdateManager {
   gm: Geoman;
-  updateStorage: { [key in FeatureSourceName]: Array<GeoJSONSourceDiffHashed> };
-  autoUpdatesEnabled: boolean = true;
+  updateStorage: {
+    [key in FeatureSourceName]: {
+      diff: GeoJSONSourceDiffHashed | null;
+      method: UpdateMethod;
+    };
+  };
   delayedSourceUpdateMethods: SourceUpdateMethods;
 
   constructor(gm: Geoman) {
     this.gm = gm;
-    this.updateStorage = Object.fromEntries(typedValues(SOURCES).map((name) => [name, []]));
+    this.updateStorage = Object.fromEntries(
+      typedValues(SOURCES).map((name) => [name, { diff: null, method: 'automatic' }]),
+    );
 
     this.delayedSourceUpdateMethods = Object.fromEntries(
       typedValues(SOURCES).map((sourceName) => [
@@ -32,8 +38,16 @@ export class SourceUpdateManager {
     ) as SourceUpdateMethods;
   }
 
+  beginTransaction(method: UpdateMethod, sourceName?: FeatureSourceName) {
+    const sourceNames = sourceName ? [sourceName] : Object.values(SOURCES);
+
+    sourceNames.forEach((sourceName) => {
+      this.updateStorage[sourceName].method = method;
+    });
+  }
+
   updatesPending(sourceName: FeatureSourceName): boolean {
-    return !!this.updateStorage[sourceName]?.length;
+    return this.updateStorage[sourceName] !== null;
   }
 
   getFeatureId(feature: Feature) {
@@ -52,17 +66,31 @@ export class SourceUpdateManager {
     diff?: GeoJSONSourceDiffHashed;
   }) {
     if (diff) {
-      // console.log('updateSource', diff);
-      this.updateStorage[sourceName].push(diff);
+      if (this.updateStorage[sourceName].method === 'transactional-set') {
+        if (!this.updateStorage[sourceName].diff) {
+          this.updateStorage[sourceName].diff = {};
+        }
+        if (diff.update) {
+          console.error('In transactional-set updates are not allowed');
+        }
+        this.mergeGeoJsonDiff(this.updateStorage[sourceName].diff, diff);
+      } else {
+        if (!this.updateStorage[sourceName].diff) {
+          this.updateStorage[sourceName].diff = {};
+        }
+        this.mergeGeoJsonDiff(this.updateStorage[sourceName].diff, diff);
+      }
     }
 
-    this.delayedSourceUpdateMethods[sourceName]();
+    if (this.updateStorage[sourceName].method === 'automatic') {
+      this.delayedSourceUpdateMethods[sourceName]();
+    }
   }
 
   updateSourceActual(sourceName: FeatureSourceName) {
     const source = this.gm.features.sources[sourceName];
 
-    if (this.autoUpdatesEnabled && source) {
+    if (this.updateStorage[sourceName].method === 'automatic' && source) {
       if (!source.loaded) {
         setTimeout(() => {
           this.updateSourceActual(sourceName);
@@ -70,88 +98,104 @@ export class SourceUpdateManager {
         return;
       }
 
-      const combinedDiff = this.getCombinedDiff(sourceName);
-      if (combinedDiff) {
+      if (this.updateStorage[sourceName].diff) {
         // applies non empty diff
-        source.updateData(combinedDiff).then(/* it's possible to send events here */);
-      }
-
-      if (this.updateStorage[sourceName].length > 0) {
-        setTimeout(
-          () => this.updateSourceActual(sourceName),
-          this.gm.options.settings.throttlingDelay,
-        );
+        source
+          .updateData(this.updateStorage[sourceName].diff)
+          .then(/* it's possible to send events here */);
+        this.updateStorage[sourceName].diff = null;
       }
     }
   }
 
-  withAtomicSourcesUpdate<T>(callback: () => T): T {
-    try {
-      this.autoUpdatesEnabled = false;
-      return callback();
-    } finally {
-      typedKeys(this.gm.features.sources).forEach((sourceName) => {
-        this.updateSource({ sourceName });
-      });
-      this.autoUpdatesEnabled = true;
-    }
-  }
+  commitTransaction(sourceName?: FeatureSourceName) {
+    const sourceNames = sourceName ? [sourceName] : Object.values(SOURCES);
 
-  getCombinedDiff(sourceName: FeatureSourceName): GeoJSONSourceDiffHashed | null {
-    let combinedDiff: GeoJSONSourceDiffHashed = {};
+    sourceNames.forEach((sourceName) => {
+      const source = this.gm.features.sources[sourceName];
 
-    for (let i = 0; i < MAX_DIFF_ITEMS; i += 1) {
-      if (this.updateStorage[sourceName][i] === undefined) {
-        break;
+      if (!source || !this.updateStorage[sourceName].diff) {
+        return;
       }
-      combinedDiff = this.mergeGeoJsonDiff(combinedDiff, this.updateStorage[sourceName][i]);
-    }
-    this.updateStorage[sourceName] = this.updateStorage[sourceName].slice(MAX_DIFF_ITEMS);
 
-    if (Object.values(combinedDiff).find((item) => (Array.isArray(item) ? item.length : item))) {
-      return combinedDiff;
-    }
+      if (this.updateStorage[sourceName].method === 'transactional-set') {
+        const features = this.updateStorage[sourceName].diff.add?.values() ?? [];
+        source.setData({
+          type: 'FeatureCollection',
+          features: Array.from(features),
+        });
+        // source.updateData(this.updateStorage[sourceName].diff);
+      } else if (this.updateStorage[sourceName].method === 'transactional-update') {
+        source.updateData(this.updateStorage[sourceName].diff);
+      }
 
-    return null;
+      this.updateStorage[sourceName].diff = null;
+      this.updateStorage[sourceName].method = 'automatic';
+    });
   }
 
-  mergeGeoJsonDiff(
-    prev: GeoJSONSourceDiffHashed,
-    next: GeoJSONSourceDiffHashed,
-  ): GeoJSONSourceDiffHashed {
+  // withAtomicSourcesUpdate<T>(callback: () => T): T {
+  //   try {
+  //     this.updateMethod = 'transactional-update';
+  //     return callback();
+  //   } finally {
+  //     typedKeys(this.gm.features.sources).forEach((sourceName) => {
+  //       this.updateSource({ sourceName });
+  //     });
+  //     this.updateMethod = 'automatic';
+  //   }
+  // }
+
+  // getCombinedDiff(sourceName: FeatureSourceName): GeoJSONSourceDiffHashed | null {
+  //   let combinedDiff: GeoJSONSourceDiffHashed = {};
+
+  //   for (let i = 0; i < MAX_DIFF_ITEMS; i += 1) {
+  //     if (this.updateStorage[sourceName][i] === undefined) {
+  //       break;
+  //     }
+  //     combinedDiff = this.mergeGeoJsonDiff(combinedDiff, this.updateStorage[sourceName][i]);
+  //   }
+  //   this.updateStorage[sourceName] = this.updateStorage[sourceName].slice(MAX_DIFF_ITEMS);
+
+  //   if (Object.values(combinedDiff).find((item) => (Array.isArray(item) ? item.length : item))) {
+  //     return combinedDiff;
+  //   }
+
+  //   return null;
+  // }
+
+  mergeGeoJsonDiff(prev: GeoJSONSourceDiffHashed, next: GeoJSONSourceDiffHashed) {
     // Resolve merge conflicts
     SourceUpdateManager.resolveMergeConflicts(prev, next);
 
-    if (prev.removeAll || next.removeAll) next.removeAll = true;
+    if (prev.removeAll || next.removeAll) prev.removeAll = true;
 
-    if (!next.remove && prev.remove) {
-      next.remove = new Set();
+    if (next.remove && !prev.remove) {
+      prev.remove = new Set();
     }
-    prev.remove?.forEach((value) => {
-      next.remove?.add(value);
+    next.remove?.forEach((value) => {
+      prev.remove?.add(value);
     });
 
-    if (!next.add && prev.add) {
-      next.add = new Map();
+    if (next.add && !prev.add) {
+      prev.add = new Map();
     }
-    prev.add?.forEach((value, key) => {
-      next.add?.set(key, value);
+    next.add?.forEach((value, key) => {
+      prev.add?.set(key, value);
     });
 
-    if (!next.update && prev.update) {
-      next.update = new Map();
+    if (next.update && !prev.update) {
+      prev.update = new Map();
     }
-    prev.update?.forEach((value, key) => {
-      next.update?.set(key, value);
+    next.update?.forEach((value, key) => {
+      prev.update?.set(key, value);
     });
 
-    if (next.remove?.size && next.add?.size) {
-      for (const id of next.add.keys()) {
-        next.remove.delete(id);
+    if (prev.remove?.size && prev.add?.size) {
+      for (const id of prev.add.keys()) {
+        prev.remove.delete(id);
       }
     }
-
-    return next;
   }
 
   /**
