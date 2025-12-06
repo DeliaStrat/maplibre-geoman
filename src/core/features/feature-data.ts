@@ -11,6 +11,7 @@ import {
   type FeatureShape,
   type FeatureShapeProperties,
   type FeatureSourceName,
+  type GeoJSONFeatureDiff,
   type GeoJsonShapeFeature,
   type Geoman,
   type GmEditFeatureUpdatedEvent,
@@ -163,8 +164,9 @@ export class FeatureData {
     };
     this.updateGeoJsonCenter(this._geoJson);
 
+    const add = new Map<FeatureId, Feature>().set(this.id, this._geoJson);
     this.gm.features.updateManager.updateSource({
-      diff: { add: [this._geoJson] },
+      diff: { add },
       sourceName: this.sourceName,
     });
   }
@@ -175,7 +177,7 @@ export class FeatureData {
     }
 
     this.gm.features.updateManager.updateSource({
-      diff: { remove: [this.id] },
+      diff: { remove: new Set([this.id]) },
       sourceName: this.sourceName,
     });
   }
@@ -199,15 +201,13 @@ export class FeatureData {
 
     this._geoJson = { ...featureGeoJson, geometry };
 
+    const update = new Map<FeatureId, GeoJSONFeatureDiff>().set(this.id, {
+      id: this.id,
+      newGeometry: this._geoJson.geometry,
+    });
+
     this.gm.features.updateManager.updateSource({
-      diff: {
-        update: [
-          {
-            id: this.id,
-            newGeometry: this._geoJson.geometry,
-          },
-        ],
-      },
+      diff: { update },
       sourceName: this.sourceName,
     });
   }
@@ -219,18 +219,16 @@ export class FeatureData {
 
     this._geoJson.properties = { ...this._geoJson.properties, ...properties };
 
+    const update = new Map<FeatureId, GeoJSONFeatureDiff>().set(this.id, {
+      id: this.id,
+      addOrUpdateProperties: Object.entries(properties || {}).map(([key, value]) => ({
+        key,
+        value,
+      })),
+    });
+
     this.gm.features.updateManager.updateSource({
-      diff: {
-        update: [
-          {
-            id: this.id,
-            addOrUpdateProperties: Object.entries(properties || {}).map(([key, value]) => ({
-              key,
-              value,
-            })),
-          },
-        ],
-      },
+      diff: { update },
       sourceName: this.sourceName,
     });
   }
@@ -250,15 +248,13 @@ export class FeatureData {
       delete this._geoJson!.properties[key];
     });
 
+    const update = new Map<FeatureId, GeoJSONFeatureDiff>().set(this.id, {
+      id: this.id,
+      removeProperties: keysToDelete,
+    });
+
     this.gm.features.updateManager.updateSource({
-      diff: {
-        update: [
-          {
-            id: this.id,
-            removeProperties: keysToDelete,
-          },
-        ],
-      },
+      diff: { update },
       sourceName: this.sourceName,
     });
   }

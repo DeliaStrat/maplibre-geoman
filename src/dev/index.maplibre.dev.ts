@@ -126,7 +126,7 @@ const loadGeomanData = (geoman: Geoman) => {
   log.debug('Geoman instance', geoman);
 
   const loadDevShapesFlag: boolean = false;
-  const loadStressTest: boolean = false;
+  const loadStressTest: boolean = true;
   const loadCircleMarkerStressTest: boolean = false;
   const loadExternalGeoJsonFlag: boolean = false;
 
