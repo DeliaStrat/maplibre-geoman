@@ -1,7 +1,7 @@
 import { SOURCES } from '@/core/features/constants.ts';
 import { FEATURE_ID_PROPERTY, type Geoman } from '@/main.ts';
 import type { FeatureSourceName, GeoJSONFeatureDiff, GeoJSONSourceDiffHashed } from '@/types';
-import { typedKeys, typedValues } from '@/utils/typing.ts';
+import { typedValues } from '@/utils/typing.ts';
 import type { Feature } from 'geojson';
 import { throttle } from 'lodash-es';
 
