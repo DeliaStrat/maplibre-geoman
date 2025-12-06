@@ -199,11 +199,15 @@ export class FeatureData {
 
     this._geoJson = { ...featureGeoJson, geometry };
 
-    const diff = {
-      update: [this._geoJson],
-    };
     this.gm.features.updateManager.updateSource({
-      diff,
+      diff: {
+        update: [
+          {
+            id: this.id,
+            newGeometry: this._geoJson.geometry,
+          },
+        ],
+      },
       sourceName: this.sourceName,
     });
   }
@@ -214,51 +218,24 @@ export class FeatureData {
     }
 
     this._geoJson.properties = { ...this._geoJson.properties, ...properties };
-    const diff = { update: [this._geoJson] };
 
     this.gm.features.updateManager.updateSource({
-      diff,
+      diff: {
+        update: [
+          {
+            id: this.id,
+            addOrUpdateProperties: Object.entries(properties || {}).map(([key, value]) => ({
+              key,
+              value,
+            })),
+          },
+        ],
+      },
       sourceName: this.sourceName,
     });
   }
 
-  setGeoJsonCustomProperties(properties: Feature['properties']) {
-    if (!this._geoJson) {
-      throw new Error(`Feature not found: "${this.id}"`);
-    }
-
-    const mandatoryProperties = this.parseGmShapeProperties(this._geoJson);
-
-    this._geoJson.properties = { ...properties, ...mandatoryProperties };
-
-    const diff = { update: [this._geoJson] };
-    this.gm.features.updateManager.updateSource({
-      diff,
-      sourceName: this.sourceName,
-    });
-  }
-
-  updateGeoJsonCustomProperties(properties: Feature['properties']) {
-    if (!this._geoJson) {
-      throw new Error(`Feature not found: "${this.id}"`);
-    }
-
-    const mandatoryProperties = this.parseGmShapeProperties(this._geoJson);
-
-    this._geoJson.properties = {
-      ...this._geoJson.properties,
-      ...properties,
-      ...mandatoryProperties,
-    };
-
-    const diff = { update: [this._geoJson] };
-    this.gm.features.updateManager.updateSource({
-      diff,
-      sourceName: this.sourceName,
-    });
-  }
-
-  deleteGeoJsonCustomProperties(fieldNames: Array<string>) {
+  deleteGeoJsonProperties(fieldNames: Array<string>) {
     if (!this._geoJson) {
       throw new Error(`Feature not found: "${this.id}"`);
     }
@@ -268,16 +245,20 @@ export class FeatureData {
     );
 
     const keysToDelete = fieldNames.filter((fieldName) => !deniedKeys.includes(fieldName));
-    const newProperties = { ...this._geoJson.properties };
 
     keysToDelete.forEach((key) => {
       delete this._geoJson!.properties[key];
-      newProperties[key] = undefined;
     });
 
-    const diff = { update: [{ ...this._geoJson, properties: newProperties }] };
     this.gm.features.updateManager.updateSource({
-      diff,
+      diff: {
+        update: [
+          {
+            id: this.id,
+            removeProperties: keysToDelete,
+          },
+        ],
+      },
       sourceName: this.sourceName,
     });
   }

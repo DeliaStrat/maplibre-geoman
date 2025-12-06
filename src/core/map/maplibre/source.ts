@@ -2,13 +2,13 @@ import { BaseSource } from '@/core/map/base/source.ts';
 import {
   FEATURE_ID_PROPERTY,
   type GeoJsonShapeFeatureCollection,
-  type GeoJsonUniversalDiff,
+  type GeoJSONSourceDiff,
   type Geoman,
   SHAPE_NAMES,
   type ShapeName,
 } from '@/main.ts';
 import { withPromiseTimeoutRace } from '@/utils/behavior.ts';
-import type { Feature, GeoJSON } from 'geojson';
+import type { GeoJSON } from 'geojson';
 import log from 'loglevel';
 import ml from 'maplibre-gl';
 
@@ -118,43 +118,12 @@ export class MaplibreSource extends BaseSource<ml.GeoJSONSource> {
     await this.sourceInstance.setData(geoJson, true);
   }
 
-  async updateData(updateStorage: GeoJsonUniversalDiff) {
+  async updateData(updateStorage: GeoJSONSourceDiff) {
     if (!this.isInstanceAvailable()) {
       return;
     }
 
-    const mlDiff = this.convertUniversalDiffToMlDiff(updateStorage);
-    await this.sourceInstance.updateData(mlDiff, true);
-  }
-
-  convertUniversalDiffToMlDiff(diff: GeoJsonUniversalDiff): ml.GeoJSONSourceDiff {
-    // todo: check possible performance issue here,
-    // todo: feature properties updates applies geometry updates
-    return {
-      add: diff.add,
-      update: diff.update?.map(this.convertFeatureToMlUpdateDiff.bind(this)),
-      remove: diff.remove,
-    };
-  }
-
-  convertFeatureToMlUpdateDiff(feature: Feature): ml.GeoJSONFeatureDiff {
-    const addOrUpdateProperties: ml.GeoJSONFeatureDiff['addOrUpdateProperties'] = [];
-    const removeProperties: ml.GeoJSONFeatureDiff['removeProperties'] = [];
-
-    Object.entries(feature.properties || {}).forEach(([key, value]) => {
-      if (value === undefined) {
-        removeProperties.push(key);
-      } else {
-        addOrUpdateProperties.push({ key, value });
-      }
-    });
-
-    return {
-      id: feature.properties?.[FEATURE_ID_PROPERTY],
-      newGeometry: feature.geometry,
-      addOrUpdateProperties,
-      removeProperties,
-    };
+    await this.sourceInstance.updateData(updateStorage, true);
   }
 
   remove() {

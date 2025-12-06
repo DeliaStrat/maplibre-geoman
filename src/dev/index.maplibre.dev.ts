@@ -89,9 +89,8 @@ const buttonHandlers = {
         [-4.1550035432676964, 50.75747515540502],
       ],
     });
-    feature?.setGeoJsonCustomProperties({ testX: 'test-555' });
-    feature?.setGeoJsonCustomProperties({ testY: 'test-777' });
-    feature?.deleteGeoJsonCustomProperties(['testX', '__gm_shape']);
+    feature?.updateGeoJsonProperties({ testX: 'test-555' });
+    feature?.deleteGeoJsonProperties(['testX', '__gm_shape']);
   },
   '#b04': async () => {
     const geoman = window.geoman;
