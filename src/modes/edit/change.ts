@@ -106,7 +106,18 @@ export class EditChange extends BaseDrag {
 
     const featureData = event.featureData;
     const shape = featureData.shape;
-    const updatedGeoJson = this.shapeUpdateHandlers[shape]?.(event) || null;
+
+    const customUpdateHandlerFunc = this.gm.options.settings.customUpdateHandler;
+
+    let updatedGeoJson: GeoJsonShapeFeature | null = null;
+
+    if (customUpdateHandlerFunc) {
+      updatedGeoJson = customUpdateHandlerFunc(shape, event);
+    }
+
+    if (!updatedGeoJson) {
+      updatedGeoJson = this.shapeUpdateHandlers[shape]?.(event) || null;
+    }
 
     if (updatedGeoJson) {
       this.fireBeforeFeatureUpdate({

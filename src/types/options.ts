@@ -1,5 +1,5 @@
 import defaultLayerStyles from '@/core/options/layers/style.ts';
-import type { ModeName } from '@/types/controls.ts';
+import type { ModeName, SystemControl } from '@/types/controls.ts';
 import type { BaseControlsPosition } from '@/types/map/index.ts';
 import type {
   ActionOptions,
@@ -11,7 +11,8 @@ import type {
 import type { PartialDeep } from 'type-fest';
 
 import { ACTION_TYPES, MODE_TYPES } from '@/modes/constants.ts';
-import type { GeoJsonShapeFeature } from './geojson';
+import type { GeoJsonShapeFeature, SegmentData } from './geojson';
+import type { BaseDraw, FeatureData, FeatureShape, Geoman, GmEditMarkerMoveEvent } from '@/main';
 
 export type ModeType = (typeof MODE_TYPES)[number];
 export type ActionType = (typeof ACTION_TYPES)[number];
@@ -44,6 +45,15 @@ export type GmOptionsData = {
       default: string;
       control: string;
     };
+    customGetAllShapeSegments?: (featureData: FeatureData) => SegmentData[] | null;
+    customUpdateHandler?: (
+      shape: FeatureShape,
+      event: GmEditMarkerMoveEvent,
+    ) => GeoJsonShapeFeature | null;
+    customRotateHandler?: (
+      shape: FeatureShape,
+      event: GmEditMarkerMoveEvent,
+    ) => GeoJsonShapeFeature | null;
   };
   layerStyles: typeof defaultLayerStyles;
   controls: {
