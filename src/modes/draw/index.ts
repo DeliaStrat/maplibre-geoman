@@ -33,6 +33,10 @@ export const createDrawInstance = (gm: Geoman, shape: DrawModeName) => {
     return new drawClassMap[shape](gm);
   }
 
+  if (gm.options.extraDrawModes[shape]) {
+    return new gm.options.extraDrawModes[shape].drawClass(gm);
+  }
+
   log.error(`Draw "${shape}" is not available`);
   return null;
 };

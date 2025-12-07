@@ -28,13 +28,23 @@ export class GmOptions {
   settings: GmOptionsData['settings'];
   controls: GmOptionsData['controls'];
   layerStyles: GmOptionsData['layerStyles'];
+  extraDrawModes: GmOptionsData['extraDrawModes'];
 
   constructor(gm: Geoman, inputOptions: PartialDeep<GmOptionsData>) {
     this.gm = gm;
     const options = this.getMergedOptions(inputOptions);
     this.settings = options.settings;
-    this.controls = options.controls;
+    this.controls = {
+      ...options.controls,
+      draw: {
+        ...options.controls.draw,
+        ...Object.fromEntries(
+          Object.entries(options.extraDrawModes).map(([key, value]) => [key, value.options]),
+        ),
+      },
+    };
     this.layerStyles = options.layerStyles;
+    this.extraDrawModes = options.extraDrawModes;
   }
 
   getMergedOptions(options: PartialDeep<GmOptionsData> = {}): GmOptionsData {
@@ -63,13 +73,14 @@ export class GmOptions {
     }
 
     const sectionOptions = this.controls[modeType] as GenericControlsOptions;
-    const controlOptions = sectionOptions[modeName];
+    const controlOptions = sectionOptions[modeName] ?? this.extraDrawModes[modeName].options;
     if (controlOptions) {
       controlOptions.active = true;
       this.fireModeEvent(modeType, modeName, 'mode_start');
       this.fireControlEvent(modeType, modeName, 'on');
       this.fireModeEvent(modeType, modeName, 'mode_started');
     } else {
+      this.fireModeEvent(modeType, modeName, 'mode_end');
       log.error("Can't find control section for", modeType, modeName);
     }
   }
@@ -83,7 +94,7 @@ export class GmOptions {
     }
 
     const sectionOptions = this.controls[modeType] as GenericControlsOptions;
-    const controlOptions = sectionOptions[modeName];
+    const controlOptions = sectionOptions[modeName] ?? this.extraDrawModes[modeName].options;
     if (controlOptions) {
       controlOptions.active = false;
       this.fireModeEvent(modeType, modeName, 'mode_end');
@@ -132,8 +143,11 @@ export class GmOptions {
   }
 
   isModeAvailable(actionType: ActionType, modeName: ModeName): boolean {
-    if (actionType === 'draw' && includesWithType(modeName, DRAW_MODES)) {
-      return !!this.gm.drawClassMap[modeName];
+    if (
+      actionType === 'draw' &&
+      includesWithType(modeName, [...DRAW_MODES, ...Object.keys(this.gm.options.extraDrawModes)])
+    ) {
+      return !!(this.gm.drawClassMap[modeName] ?? this.gm.options.extraDrawModes[modeName]);
     } else if (actionType === 'edit' && includesWithType(modeName, EDIT_MODES)) {
       return !!this.gm.editClassMap[modeName];
     } else if (actionType === 'helper' && includesWithType(modeName, HELPER_MODES)) {

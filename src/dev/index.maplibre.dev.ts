@@ -17,6 +17,8 @@ import log from 'loglevel';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import ml from 'maplibre-gl';
 import type { PartialDeep } from 'type-fest';
+import { DrawMission } from './DrawMission.ts';
+import pin from '@/assets/images/controls2/pin.svg';
 
 log.setLevel(log.levels.TRACE);
 
@@ -46,6 +48,25 @@ const gmOptions: PartialDeep<GmOptionsData> = {
         active: false,
         uiEnabled: true,
       },
+    },
+  },
+  extraDrawModes: {
+    mission: {
+      control: {
+        type: 'draw',
+        eventType: 'toggle',
+        targetMode: 'mission',
+        settings: {
+          exclusive: true,
+        },
+      },
+      options: {
+        title: 'Mission',
+        icon: pin,
+        uiEnabled: true,
+        active: false,
+      },
+      drawClass: DrawMission,
     },
   },
 };

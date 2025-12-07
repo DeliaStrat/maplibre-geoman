@@ -19,9 +19,14 @@ export type ActionInstance = ReturnType<
   typeof createDrawInstance | typeof createEditInstance | typeof createHelperInstance
 >;
 
+export interface DrawModeRegistry {
+  modes: (typeof DRAW_MODES)[number] | 'mission';
+  extraModes: (typeof EXTRA_DRAW_MODES)[number] | 'mission';
+}
+
 export type ShapeName = (typeof SHAPE_NAMES)[number];
-export type DrawModeName = (typeof DRAW_MODES)[number];
-export type ExtraDrawModeName = (typeof EXTRA_DRAW_MODES)[number];
+export type DrawModeName = DrawModeRegistry['modes'];
+export type ExtraDrawModeName = DrawModeRegistry['extraModes'];
 export type EditModeName = (typeof EDIT_MODES)[number];
 export type HelperModeName = (typeof HELPER_MODES)[number];
 

@@ -1,5 +1,5 @@
 import defaultLayerStyles from '@/core/options/layers/style.ts';
-import type { ModeName } from '@/types/controls.ts';
+import type { ModeName, SystemControl } from '@/types/controls.ts';
 import type { BaseControlsPosition } from '@/types/map/index.ts';
 import type {
   ActionOptions,
@@ -12,6 +12,7 @@ import type { PartialDeep } from 'type-fest';
 
 import { ACTION_TYPES, MODE_TYPES } from '@/modes/constants.ts';
 import type { GeoJsonShapeFeature } from './geojson';
+import type { BaseDraw, Geoman } from '@/main';
 
 export type ModeType = (typeof MODE_TYPES)[number];
 export type ActionType = (typeof ACTION_TYPES)[number];
@@ -51,6 +52,14 @@ export type GmOptionsData = {
     edit: { [key in EditModeName]?: ControlOptions };
     helper: { [key in HelperModeName]?: ControlOptions };
   };
+  extraDrawModes: Record<
+    string,
+    {
+      control: SystemControl<'draw', DrawModeName>;
+      options: ControlOptions;
+      drawClass: new (gm: Geoman) => BaseDraw;
+    }
+  >;
 };
 export type GmOptionsPartial = PartialDeep<GmOptionsData>;
 export type GenericControlsOptions = {

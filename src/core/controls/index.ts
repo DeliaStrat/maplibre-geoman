@@ -20,6 +20,7 @@ import { typedKeys } from '@/utils/typing.ts';
 import { cloneDeep } from 'lodash-es';
 import log from 'loglevel';
 import { mount, unmount } from 'svelte';
+import type { Geoman, GmOptionsData } from '@/main.ts';
 
 export default class GMControl extends BaseControl {
   controls: SystemControls = cloneDeep(systemControls);
@@ -30,6 +31,22 @@ export default class GMControl extends BaseControl {
     [`${GM_SYSTEM_PREFIX}:edit`]: this.handleModeEvent.bind(this),
     [`${GM_SYSTEM_PREFIX}:helper`]: this.handleModeEvent.bind(this),
   };
+
+  constructor(gm: Geoman, extraDrawModes?: GmOptionsData['extraDrawModes']) {
+    super(gm);
+
+    if (extraDrawModes) {
+      this.controls = {
+        ...this.controls,
+        draw: {
+          ...this.controls.draw,
+          ...Object.fromEntries(
+            Object.entries(extraDrawModes).map(([key, value]) => [key, value.control]),
+          ),
+        },
+      };
+    }
+  }
 
   onAdd(): HTMLElement {
     this.createControls();

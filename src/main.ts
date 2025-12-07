@@ -61,7 +61,7 @@ export class Geoman {
     this.options = this.initCoreOptions(options);
     this.events = this.initCoreEvents();
     this.features = this.initCoreFeatures();
-    this.control = this.initCoreControls();
+    this.control = this.initCoreControls(options.extraDrawModes);
     this.markerPointer = this.initMarkerPointer();
 
     const mapWithGeoman = Object.assign(map, { gm: this });
@@ -102,8 +102,8 @@ export class Geoman {
     return new Features(this);
   }
 
-  initCoreControls() {
-    return new GmControl(this);
+  initCoreControls(extraDrawModes?: GmOptionsData['extraDrawModes']) {
+    return new GmControl(this, extraDrawModes);
   }
 
   initMarkerPointer() {
