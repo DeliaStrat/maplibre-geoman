@@ -83,7 +83,18 @@ export class EditRotate extends BaseDrag {
 
   moveVertex(event: GmEditMarkerMoveEvent) {
     const featureData = event.featureData;
-    const updatedGeoJson = this.shapeRotateHandlers[featureData.shape]?.(event) || null;
+
+    const customRotateHandlerFunc = this.gm.options.settings.customRotateHandler;
+
+    let updatedGeoJson: GeoJsonShapeFeature | null = null;
+
+    if (customRotateHandlerFunc) {
+      updatedGeoJson = customRotateHandlerFunc(featureData.shape, event);
+    }
+
+    if (!updatedGeoJson) {
+      updatedGeoJson = this.shapeRotateHandlers[featureData.shape]?.(event) || null;
+    }
 
     if (updatedGeoJson) {
       this.fireBeforeFeatureUpdate({
