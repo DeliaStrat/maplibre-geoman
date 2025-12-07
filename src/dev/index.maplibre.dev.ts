@@ -126,13 +126,14 @@ const loadGeomanData = (geoman: Geoman) => {
   log.debug(`Running mode: "${import.meta.env.MODE}"`);
   log.debug('Geoman instance', geoman);
 
-  const loadDevShapesFlag: boolean = false;
+  const loadDevShapesFlag: boolean = true;
   const loadStressTest: boolean = false;
   const loadCircleMarkerStressTest: boolean = false;
   const loadExternalGeoJsonFlag: boolean = false;
 
   const step = 0.2;
   const size = 0.18;
+
   if (loadDevShapesFlag) {
     // loadDevShapes(geoman, devShapes);
     loadDevShapes(geoman, testShapes as GeoJsonImportFeature[]);
