@@ -132,6 +132,7 @@ const loadGeomanData = (geoman: Geoman) => {
 
   const step = 0.2;
   const size = 0.18;
+
   if (loadDevShapesFlag) {
     // loadDevShapes(geoman, devShapes);
     loadDevShapes(geoman, testShapes as GeoJsonImportFeature[]);
