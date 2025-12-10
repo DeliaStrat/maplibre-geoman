@@ -1,6 +1,6 @@
 import defaultLayerStyles from '@/core/options/layers/style.ts';
 import type { ModeName } from '@/types/controls.ts';
-import type { BaseControlsPosition } from '@/types/map/index.ts';
+import type { BaseControlsPosition, LngLatTuple } from '@/types/map/index.ts';
 import type {
   ActionOptions,
   ActionSettings,
@@ -46,9 +46,14 @@ export type GmOptionsData = {
       control: string;
     };
     customGetAllShapeSegments?: (featureData: FeatureData) => SegmentData[] | null;
-    customUpdateHandler?: (
+    customVertexUpdateHandler?: (
       shape: FeatureShape,
       event: GmEditMarkerMoveEvent,
+    ) => GeoJsonShapeFeature | null;
+    customShapeUpdateHandler?: (
+      featureData: FeatureData,
+      oldLngLat: LngLatTuple,
+      newLngLat: LngLatTuple,
     ) => GeoJsonShapeFeature | null;
     customRotateHandler?: (
       shape: FeatureShape,

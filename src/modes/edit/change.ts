@@ -107,12 +107,12 @@ export class EditChange extends BaseDrag {
     const featureData = event.featureData;
     const shape = featureData.shape;
 
-    const customUpdateHandlerFunc = this.gm.options.settings.customUpdateHandler;
+    const customVertexUpdateHandlerFunc = this.gm.options.settings.customVertexUpdateHandler;
 
     let updatedGeoJson: GeoJsonShapeFeature | null = null;
 
-    if (customUpdateHandlerFunc) {
-      updatedGeoJson = customUpdateHandlerFunc(shape, event);
+    if (customVertexUpdateHandlerFunc) {
+      updatedGeoJson = customVertexUpdateHandlerFunc(shape, event);
     }
 
     if (!updatedGeoJson) {

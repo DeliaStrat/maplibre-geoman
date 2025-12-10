@@ -62,7 +62,7 @@ const gmOptions: PartialDeep<GmOptionsData> = {
 
       return null;
     },
-    customUpdateHandler(shape, { featureData, lngLatEnd, markerData }) {
+    customVertexUpdateHandler(shape, { featureData, lngLatEnd, markerData }) {
       if (shape === 'polygon') {
         const geoJson = cloneDeep(featureData.getGeoJson() as GeoJsonShapeFeature);
         const coordPath = cloneDeep(markerData.position.path);

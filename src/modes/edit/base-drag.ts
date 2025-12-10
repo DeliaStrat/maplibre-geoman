@@ -146,32 +146,41 @@ export abstract class BaseDrag extends BaseEdit {
       return;
     }
 
-    const shapeUpdateMethod = this.getUpdatedGeoJsonHandlers[featureData.shape];
-    if (shapeUpdateMethod) {
-      const updatedGeoJson = shapeUpdateMethod(featureData, this.previousLngLat, newLngLat);
-      if (!updatedGeoJson) {
-        log.error('BaseDrag.moveFeature: invalid updatedGeoJson', featureData);
-        return;
-      }
+    const customShapeUpdateHandlerFunc = this.gm.options.settings.customShapeUpdateHandler;
 
-      this.fireBeforeFeatureUpdate({
-        features: [featureData],
-        geoJsonFeatures: [updatedGeoJson],
-        forceMode: 'drag',
-      });
+    let updatedGeoJson: GeoJsonShapeFeature | null = null;
 
-      const isUpdated = this.updateFeatureGeoJson({
-        featureData,
-        featureGeoJson: updatedGeoJson,
-        forceMode: 'drag',
-      });
-      if (!isEqual(featureData.getGeoJson().properties, updatedGeoJson.properties)) {
-        featureData.updateGeoJsonProperties(updatedGeoJson.properties);
-      }
+    if (customShapeUpdateHandlerFunc) {
+      updatedGeoJson = customShapeUpdateHandlerFunc(featureData, this.previousLngLat, newLngLat);
+    }
 
-      if (isUpdated) {
-        this.previousLngLat = newLngLat;
-      }
+    if (!updatedGeoJson) {
+      const shapeUpdateMethod = this.getUpdatedGeoJsonHandlers[featureData.shape];
+      updatedGeoJson = shapeUpdateMethod?.(featureData, this.previousLngLat, newLngLat) ?? null;
+    }
+
+    if (!updatedGeoJson) {
+      log.error('BaseDrag.moveFeature: invalid updatedGeoJson', featureData);
+      return;
+    }
+
+    this.fireBeforeFeatureUpdate({
+      features: [featureData],
+      geoJsonFeatures: [updatedGeoJson],
+      forceMode: 'drag',
+    });
+
+    const isUpdated = this.updateFeatureGeoJson({
+      featureData,
+      featureGeoJson: updatedGeoJson,
+      forceMode: 'drag',
+    });
+    if (!isEqual(featureData.getGeoJson().properties, updatedGeoJson.properties)) {
+      featureData.updateGeoJsonProperties(updatedGeoJson.properties);
+    }
+
+    if (isUpdated) {
+      this.previousLngLat = newLngLat;
     }
   }
 
