@@ -37,6 +37,7 @@ export default defineConfig(({ mode }) => {
       svgLoader({ defaultImport: 'raw' }),
     ],
     build: {
+      minify: false,
       sourcemap: true,
       lib: {
         entry: 'src/main.ts',
