@@ -24,7 +24,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && npm run build:types",
-    "build:types": "tsc --emitDeclarationOnly && tsc-alias && rollup -c rollup.config.dts.js && rm -rf dist/types",
+    "build:types": "tsc --emitDeclarationOnly && tsc-alias && rollup -c rollup.config.dts.js && rimraf dist/types",
     "ts": "tsc --noEmit",
     "ts-watch": "tsc --noEmit --watch",
     "ts:autofix": "ts-autofix",
@@ -38,7 +38,7 @@
     "test:headed": "VITE_GEOMAN_VERSION=free playwright test --headed",
     "test:ui": "VITE_GEOMAN_VERSION=free playwright test --ui",
     "test:debug": "VITE_GEOMAN_VERSION=free playwright test --debug",
-    "prepare": "test -f dist/maplibre-geoman.es.js || npm run build"
+    "prepare": "node -e \"require('fs').existsSync('dist/maplibre-geoman.es.js') || process.exit(1)\" || npm run build"
   },
   "dependencies": {
     "@turf/area": "^7.3.1",
@@ -79,6 +79,7 @@
     "maplibre-gl": ">=5.14.0"
   },
   "devDependencies": {
+    "rimraf": "^6.0.1",
     "@eslint/compat": "^2.0.0",
     "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.1",
