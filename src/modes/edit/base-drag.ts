@@ -189,34 +189,41 @@ export abstract class BaseDrag extends BaseEdit {
   }
 
   moveFeature(featureData: FeatureData, lngLatDiff: LngLatDiff) {
-    let isUpdated = false;
-
     if (!this.flags.actionInProgress) {
-      return;
+      return false;
     }
 
-    const shapeUpdateMethod = this.getUpdatedGeoJsonHandlers[featureData.shape];
-    if (shapeUpdateMethod) {
-      const updatedGeoJson = shapeUpdateMethod(featureData, lngLatDiff);
-      if (!updatedGeoJson) {
-        log.error('BaseDrag.moveFeature: invalid updatedGeoJson', featureData);
-        return;
-      }
+    const customShapeUpdateHandlerFunc = this.gm.options.settings.customShapeUpdateHandler;
+    let updatedGeoJson: GeoJsonShapeFeature | null = null;
 
-      this.fireBeforeFeatureUpdate({
-        features: [featureData],
-        geoJsonFeatures: [updatedGeoJson],
-        forceMode: 'drag',
-      });
+    if (customShapeUpdateHandlerFunc) {
+      updatedGeoJson = customShapeUpdateHandlerFunc(featureData, lngLatDiff);
+    }
 
-      isUpdated = this.updateFeatureGeoJson({
-        featureData,
-        featureGeoJson: updatedGeoJson,
-        forceMode: 'drag',
-      });
-      if (!isEqual(featureData.getGeoJson().properties, updatedGeoJson.properties)) {
-        featureData._updateAllProperties(updatedGeoJson.properties);
-      }
+    if (!updatedGeoJson) {
+      const shapeUpdateMethod = this.getUpdatedGeoJsonHandlers[featureData.shape];
+      updatedGeoJson = shapeUpdateMethod?.(featureData, lngLatDiff) ?? null;
+    }
+
+    if (!updatedGeoJson) {
+      log.error('BaseDrag.moveFeature: invalid updatedGeoJson', featureData);
+      return false;
+    }
+
+    this.fireBeforeFeatureUpdate({
+      features: [featureData],
+      geoJsonFeatures: [updatedGeoJson],
+      forceMode: 'drag',
+    });
+
+    const isUpdated = this.updateFeatureGeoJson({
+      featureData,
+      featureGeoJson: updatedGeoJson,
+      forceMode: 'drag',
+    });
+
+    if (!isEqual(featureData.getGeoJson().properties, updatedGeoJson.properties)) {
+      featureData._updateAllProperties(updatedGeoJson.properties);
     }
 
     return isUpdated;
