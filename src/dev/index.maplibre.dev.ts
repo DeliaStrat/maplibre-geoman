@@ -1,6 +1,13 @@
 import mapLibreStyle from '@/dev/maplibre-style.ts';
 import { layerStyles } from '@/dev/styles/layer-styles.ts';
-import { Geoman, type GmOptionsData, type MapInstanceWithGeoman } from '@/main.ts';
+import {
+  geoJsonPointToLngLat,
+  Geoman,
+  type GeoJsonShapeFeature,
+  type GmOptionsData,
+  type LngLatTuple,
+  type MapInstanceWithGeoman,
+} from '@/main.ts';
 import log from 'loglevel';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import ml from 'maplibre-gl';
@@ -8,6 +15,10 @@ import type { PartialDeep } from 'type-fest';
 import { mount, unmount } from 'svelte';
 import LeftPanel from '@/dev/components/LeftPanel.svelte';
 import RightPanel from '@/dev/components/RightPanel.svelte';
+import { cloneDeep, get } from 'lodash-es';
+import transformRotate from '@turf/transform-rotate';
+import centroid from '@turf/centroid';
+import bearing from '@turf/bearing';
 
 log.setLevel(log.levels.TRACE);
 
@@ -21,6 +32,53 @@ const gmOptions: PartialDeep<GmOptionsData> = {
       controlGroupClass: 'maplibregl-ctrl maplibregl-ctrl-group',
       controlContainerClass: 'gm-control-container',
       controlButtonClass: 'gm-control-button',
+    },
+    customGetAllShapeSegments(featureData) {
+      console.log(featureData);
+      return null;
+    },
+    customRotateHandler(featureData, shapeCentroid, event) {
+      if (featureData.shape === 'polygon') {
+        const featureData = event.featureData;
+
+        const geoJson = cloneDeep(featureData.getGeoJson() as GeoJsonShapeFeature);
+
+        const bearingStart = bearing(shapeCentroid, event.lngLatStart);
+        const bearingEnd = bearing(shapeCentroid, event.lngLatEnd);
+
+        const rotationAngle = bearingEnd - bearingStart;
+        const angle = (rotationAngle + 360) % 360;
+
+        geoJson.geometry = transformRotate(geoJson, angle, { pivot: shapeCentroid }).geometry;
+
+        return geoJson;
+      }
+
+      return null;
+    },
+    customVertexUpdateHandler({ featureData, lngLatEnd, markerData }) {
+      if (featureData.shape === 'polygon') {
+        const geoJson = cloneDeep(featureData.getGeoJson() as GeoJsonShapeFeature);
+        const coordPath = cloneDeep(markerData.position.path);
+        const coordIndex = coordPath.pop();
+        const coordinates = get(geoJson, coordPath) as Array<LngLatTuple>;
+
+        if (Array.isArray(coordinates) && typeof coordIndex === 'number') {
+          coordinates[coordIndex] = [...lngLatEnd];
+          if (coordIndex === 0 && featureData.shape === 'polygon') {
+            coordinates[coordinates.length - 1] = [...lngLatEnd];
+          }
+        } else {
+          log.error('BaseDrag.moveSingleVertex: invalid coordinates', geoJson, coordPath);
+        }
+
+        return geoJson;
+      }
+
+      return null;
+    },
+    customShapeUpdateHandler(featureData, lngLatDiff) {
+      return null;
     },
   },
   layerStyles: layerStyles,

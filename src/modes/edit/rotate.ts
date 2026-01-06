@@ -113,8 +113,18 @@ export class EditRotate extends BaseDrag {
     );
 
     [event.featureData, ...(event.linkedFeatures ?? [])].map((featureData) => {
-      const updatedGeoJson =
-        this.shapeRotateHandlers[featureData.shape]?.(featureData, shapeCentroid, event) || null;
+      const customRotateHandlerFunc = this.gm.options.settings.customRotateHandler;
+
+      let updatedGeoJson: GeoJsonShapeFeature | null = null;
+
+      if (customRotateHandlerFunc) {
+        updatedGeoJson = customRotateHandlerFunc(featureData, shapeCentroid, event);
+      }
+
+      if (!updatedGeoJson) {
+        updatedGeoJson =
+          this.shapeRotateHandlers[featureData.shape]?.(featureData, shapeCentroid, event) || null;
+      }
 
       if (updatedGeoJson) {
         this.fireBeforeFeatureUpdate({
