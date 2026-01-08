@@ -317,6 +317,9 @@ export class ShapeMarkersHelper extends BaseHelper {
       this.addCenterMarker(featureData);
 
       let shapeSegments: SegmentData[] | null = null;
+      let useCustomFunction = true;
+
+      let endMarkerIndexes = this.getEndMarkerIndexes(featureData);
 
       const customGetSegmentsFunc = this.gm.options.settings.customGetAllShapeSegments;
 
@@ -325,10 +328,11 @@ export class ShapeMarkersHelper extends BaseHelper {
       }
 
       if (!shapeSegments) {
+        useCustomFunction = false;
         shapeSegments = this.getAllShapeSegments(featureData);
+      } else {
+        endMarkerIndexes = new Set([shapeSegments.length - 1]);
       }
-
-      const endMarkerIndexes = this.getEndMarkerIndexes(featureData);
 
       shapeSegments.forEach((segmentData, index) => {
         const isVertexMarkerAllowed = customGetSegmentsFunc
@@ -350,7 +354,7 @@ export class ShapeMarkersHelper extends BaseHelper {
         }
 
         // edge middle marker
-        if (!customGetSegmentsFunc && this.isEdgeMarkerAllowed(featureData)) {
+        if (!useCustomFunction && this.isEdgeMarkerAllowed(featureData)) {
           const marker = this.createOrUpdateEdgeMarker(segmentData, featureData);
           featureData.markers.set(marker.markerKey, marker.markerData);
         }
@@ -542,6 +546,10 @@ export class ShapeMarkersHelper extends BaseHelper {
     }
 
     let shapeSegments: SegmentData[] | null = null;
+    let useCustomFunction = true;
+
+    const currentMarkerKeys = new Set(featureData.markers.keys());
+    let endMarkerIndexes = this.getEndMarkerIndexes(featureData);
 
     const customGetSegmentsFunc = this.gm.options.settings.customGetAllShapeSegments;
 
@@ -550,12 +558,11 @@ export class ShapeMarkersHelper extends BaseHelper {
     }
 
     if (!shapeSegments) {
+      useCustomFunction = false;
       shapeSegments = this.getAllShapeSegments(featureData);
+    } else {
+      endMarkerIndexes = new Set([shapeSegments.length - 1]);
     }
-
-    const currentMarkerKeys = new Set(featureData.markers.keys());
-
-    const endMarkerIndexes = this.getEndMarkerIndexes(featureData);
 
     shapeSegments.forEach((segmentData, index) => {
       const isVertexMarkerAllowed = customGetSegmentsFunc
@@ -575,7 +582,7 @@ export class ShapeMarkersHelper extends BaseHelper {
         }
       }
 
-      if (!customGetSegmentsFunc && this.isEdgeMarkerAllowed(featureData)) {
+      if (!useCustomFunction && this.isEdgeMarkerAllowed(featureData)) {
         const marker = this.createOrUpdateEdgeMarker(segmentData, featureData);
         currentMarkerKeys.delete(marker.markerKey);
       }

@@ -1,7 +1,6 @@
 import mapLibreStyle from '@/dev/maplibre-style.ts';
 import { layerStyles } from '@/dev/styles/layer-styles.ts';
 import {
-  geoJsonPointToLngLat,
   Geoman,
   type GeoJsonShapeFeature,
   type GmOptionsData,
@@ -17,7 +16,6 @@ import LeftPanel from '@/dev/components/LeftPanel.svelte';
 import RightPanel from '@/dev/components/RightPanel.svelte';
 import { cloneDeep, get } from 'lodash-es';
 import transformRotate from '@turf/transform-rotate';
-import centroid from '@turf/centroid';
 import bearing from '@turf/bearing';
 
 log.setLevel(log.levels.TRACE);
@@ -37,14 +35,12 @@ const gmOptions: PartialDeep<GmOptionsData> = {
       console.log(featureData);
       return null;
     },
-    customRotateHandler(featureData, shapeCentroid, event) {
+    customRotateHandler({ featureData, lngLatStart, lngLatEnd }, shapeCentroid) {
       if (featureData.shape === 'polygon') {
-        const featureData = event.featureData;
-
         const geoJson = cloneDeep(featureData.getGeoJson() as GeoJsonShapeFeature);
 
-        const bearingStart = bearing(shapeCentroid, event.lngLatStart);
-        const bearingEnd = bearing(shapeCentroid, event.lngLatEnd);
+        const bearingStart = bearing(shapeCentroid, lngLatStart);
+        const bearingEnd = bearing(shapeCentroid, lngLatEnd);
 
         const rotationAngle = bearingEnd - bearingStart;
         const angle = (rotationAngle + 360) % 360;
@@ -77,7 +73,7 @@ const gmOptions: PartialDeep<GmOptionsData> = {
 
       return null;
     },
-    customShapeUpdateHandler(featureData, lngLatDiff) {
+    customDragHandler() {
       return null;
     },
   },
