@@ -29,6 +29,7 @@ import {
   type SourcesStorage,
 } from '@/main.ts';
 import { dedupeById } from '@/utils/collections.ts';
+import { SPECIAL_SHAPE_NAMES } from '@/modes/constants.ts';
 import { fixGeoJsonFeature, getCustomFeatureId } from '@/utils/features.ts';
 import { getGeoJsonBounds } from '@/utils/geojson.ts';
 import { isMapPointerEvent } from '@/utils/guards/map.ts';
@@ -295,7 +296,16 @@ export class Features {
       queryCoordinates: point,
       sourceNames,
     });
-    return features.length ? features[0] : null;
+
+    if (features.length === 0) {
+      return null;
+    }
+
+    const specialFeature = features.find((featureData) =>
+      SPECIAL_SHAPE_NAMES.includes(featureData.shape as (typeof SPECIAL_SHAPE_NAMES)[number]),
+    );
+
+    return specialFeature ?? features[0];
   }
 
   getFeaturesByGeoJsonBounds({
