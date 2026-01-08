@@ -17,7 +17,9 @@ import {
   type GeoJsonShapeFeatureCollection,
   type Geoman,
   type GmDrawFeatureCreatedEvent,
+  type GmEditSelectionChangeEvent,
   type ImportGeoJsonOptions,
+  isDefined,
   type LngLatTuple,
   type MarkerData,
   type PartialLayerStyle,
@@ -26,6 +28,7 @@ import {
   type ShapeName,
   type SourcesStorage,
 } from '@/main.ts';
+import { dedupeById } from '@/utils/collections.ts';
 import { fixGeoJsonFeature, getCustomFeatureId } from '@/utils/features.ts';
 import { getGeoJsonBounds } from '@/utils/geojson.ts';
 import { isMapPointerEvent } from '@/utils/guards/map.ts';
@@ -52,6 +55,8 @@ export class Features {
     SOURCES.temporary,
     SOURCES.internal,
   ];
+
+  selection = new Set<FeatureId>();
 
   sources: SourcesStorage;
   defaultSourceName: FeatureSourceName = SOURCES.main;
@@ -206,6 +211,17 @@ export class Features {
     this.defaultSourceName = sourceName;
   }
 
+  setSelection(featureIds: Array<FeatureId>, fireEvent = false) {
+    this.selection = new Set(featureIds);
+    if (fireEvent) {
+      this.fireSelectionChangeEvent(featureIds);
+    }
+  }
+
+  clearSelection() {
+    this.selection.clear();
+  }
+
   createSource(sourceName: FeatureSourceName) {
     const source = this.gm.mapAdapter.addSource(sourceName, {
       type: 'FeatureCollection',
@@ -242,6 +258,25 @@ export class Features {
       featureData.delete();
     });
     this.featureStore.clear();
+  }
+
+  getLinkedFeatures(featureData: FeatureData): FeatureData[] {
+    const selectionFeatures = Array.from(this.selection)
+      .map((featureId) => this.featureStore.get(featureId))
+      .filter(isDefined);
+
+    const groupNames = new Set(
+      selectionFeatures.map((feature) => feature.getShapeProperty('group')).filter(isDefined),
+    );
+
+    const groupFeatures = Array.from(this.featureStore.values()).filter((featureData) => {
+      const group = featureData.getShapeProperty('group');
+      return SHAPE_NAMES.includes(featureData.shape as ShapeName) && group && groupNames.has(group);
+    });
+
+    return dedupeById([...selectionFeatures, ...groupFeatures]).filter(
+      (f) => f.id !== featureData.id,
+    );
   }
 
   getFeatureByMouseEvent({
@@ -751,5 +786,17 @@ export class Features {
       };
       this.gm.events.fire(`${GM_SYSTEM_PREFIX}:draw`, payload);
     }
+  }
+
+  fireSelectionChangeEvent(selection: FeatureId[]) {
+    const payload: GmEditSelectionChangeEvent = {
+      name: `${GM_SYSTEM_PREFIX}:edit:selection_change`,
+      level: 'system',
+      actionType: 'edit',
+      action: 'selection_change',
+      selection,
+      mode: null,
+    };
+    this.gm.events.fire(`${GM_SYSTEM_PREFIX}:edit`, payload);
   }
 }

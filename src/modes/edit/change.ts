@@ -18,6 +18,7 @@ import {
   getGeoJsonCircle,
   getGeoJsonCoordinatesCount,
   getGeoJsonEllipse,
+  getLngLatDiff,
   isLineStringFeature,
   isMultiPolygonFeature,
   isPolygonFeature,
@@ -72,7 +73,8 @@ export class EditChange extends BaseDrag {
         this.moveVertex(event);
         return { next: false };
       } else if (event.lngLatEnd) {
-        this.moveSource(event.featureData, event.lngLatStart, event.lngLatEnd);
+        const lngLatDiff = getLngLatDiff(event.lngLatStart, event.lngLatEnd);
+        this.moveSource(event.featureData, lngLatDiff);
         return { next: false };
       }
     }
@@ -106,7 +108,18 @@ export class EditChange extends BaseDrag {
 
     const featureData = event.featureData;
     const shape = featureData.shape;
-    const updatedGeoJson = this.shapeUpdateHandlers[shape]?.(event) || null;
+
+    const customVertexUpdateHandlerFunc = this.gm.options.settings.customVertexUpdateHandler;
+
+    let updatedGeoJson: GeoJsonShapeFeature | null = null;
+
+    if (customVertexUpdateHandlerFunc) {
+      updatedGeoJson = customVertexUpdateHandlerFunc(event);
+    }
+
+    if (!updatedGeoJson) {
+      updatedGeoJson = this.shapeUpdateHandlers[shape]?.(event) || null;
+    }
 
     if (updatedGeoJson) {
       this.fireBeforeFeatureUpdate({
@@ -225,13 +238,7 @@ export class EditChange extends BaseDrag {
       radius: this.gm.mapAdapter.getDistance(shapeCenter, lngLatEnd),
     });
 
-    return {
-      type: 'Feature',
-      properties: {
-        shape: 'circle',
-      },
-      geometry: circlePolygon.geometry,
-    };
+    return circlePolygon;
   }
 
   updateEllipse(args: GmEditMarkerMoveEvent): GeoJsonShapeFeature | null {
