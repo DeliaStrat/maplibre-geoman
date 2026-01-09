@@ -89,7 +89,6 @@ export abstract class BaseDrag extends BaseEdit {
       this.featureData = featureData;
 
       this.gm.features.updateManager.beginTransaction('transactional-update');
-      this.featureData.changeSource({ sourceName: SOURCES.temporary, atomic: true });
       this.linkedFeatures = linkedFeatures;
 
       this.gm.mapAdapter.setDragPan(false);
