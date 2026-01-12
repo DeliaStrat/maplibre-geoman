@@ -335,7 +335,7 @@ export class ShapeMarkersHelper extends BaseHelper {
       }
 
       shapeSegments.forEach((segmentData, index) => {
-        const isVertexMarkerAllowed = customGetSegmentsFunc
+        const isVertexMarkerAllowed = useCustomFunction
           ? true
           : // generic vertex marker
             this.isMarkerIndexAllowed(featureData.shape, index, shapeSegments.length);
@@ -565,7 +565,7 @@ export class ShapeMarkersHelper extends BaseHelper {
     }
 
     shapeSegments.forEach((segmentData, index) => {
-      const isVertexMarkerAllowed = customGetSegmentsFunc
+      const isVertexMarkerAllowed = useCustomFunction
         ? true
         : // generic vertex marker
           this.isMarkerIndexAllowed(featureData.shape, index, shapeSegments.length);
