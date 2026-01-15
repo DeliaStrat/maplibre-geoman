@@ -68,3 +68,9 @@ export type SegmentData = {
   middle: PositionData;
   edgeMarkerKey: string;
 };
+
+export type SimplePoint = {
+  x: number;
+  y: number;
+  dist(p: { x: number; y: number }): number;
+};

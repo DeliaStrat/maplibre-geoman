@@ -17,6 +17,7 @@ import {
   type ScreenPoint,
   type SegmentData,
   type SegmentPosition,
+  type SimplePoint,
   SOURCES,
 } from '@/main.ts';
 import { BaseHelper } from '@/modes/helpers/base.ts';
@@ -45,6 +46,7 @@ export class ShapeMarkersHelper extends BaseHelper {
   previousPosition: LngLatTuple | null = null;
   activeMarker: MarkerData | null = null;
   activeFeatureData: FeatureData | null = null;
+  initialPoint: SimplePoint | null = null;
   linkedFeatures: Array<FeatureData> = [];
   sharedMarkers: Array<SharedMarker> = [];
   allowedShapes: Array<FeatureShape> = ['circle', 'line', 'rectangle', 'polygon', 'ellipse'];
@@ -134,7 +136,7 @@ export class ShapeMarkersHelper extends BaseHelper {
 
     if (this.activeFeatureData) {
       if (!this.gm.features.selection.has(this.activeFeatureData.id)) {
-        this.gm.features.setSelection([this.activeFeatureData.id], true);
+        this.gm.features.setSelection([this.activeFeatureData.id]);
       }
       const linkedFeatures = this.gm.features.getLinkedFeatures(this.activeFeatureData);
       if (linkedFeatures.some((f) => f.getShapeProperty('disableEdit') === true)) {
@@ -147,6 +149,7 @@ export class ShapeMarkersHelper extends BaseHelper {
       return { next: true };
     }
 
+    this.initialPoint = event.point;
     this.previousPosition = getFeatureFirstPoint(this.activeMarker.instance);
     this.gm.mapAdapter.setDragPan(false);
 
@@ -176,7 +179,11 @@ export class ShapeMarkersHelper extends BaseHelper {
     return { next: false };
   }
 
-  onMouseUp(): MapHandlerReturnData {
+  onMouseUp(event: BaseMapEvent): MapHandlerReturnData {
+    if (!this.activeFeatureData || !isMapPointerEvent(event, { warning: true })) {
+      return { next: true };
+    }
+
     if (!this.activeMarker) {
       return { next: true };
     }
@@ -187,6 +194,11 @@ export class ShapeMarkersHelper extends BaseHelper {
       linkedFeatures: this.linkedFeatures,
     };
 
+    if (this.initialPoint && this.initialPoint.dist(event.point) < 1) {
+      this.gm.features.setSelection([this.activeFeatureData.id], true);
+    }
+
+    this.initialPoint = null;
     this.activeMarker = null;
     this.activeFeatureData = null;
     this.sharedMarkers = [];
