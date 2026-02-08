@@ -15,7 +15,9 @@ import {
   type MarkerData,
   type PositionData,
   type ScreenPoint,
+  type SegmentData,
   type SegmentPosition,
+  type SimplePoint,
   SOURCES,
 } from '@/main.ts';
 import { BaseHelper } from '@/modes/helpers/base.ts';
@@ -31,12 +33,6 @@ import type { BaseMapEvent, BaseMapPointerEvent } from '@mapLib/types/events.ts'
 import { cloneDeep, intersection } from 'lodash-es';
 import log from 'loglevel';
 
-type SegmentData = {
-  segment: SegmentPosition;
-  middle: PositionData;
-  edgeMarkerKey: string;
-};
-
 type CreateMarkerParams = {
   type: MarkerData['type'];
   positionData: PositionData;
@@ -50,6 +46,8 @@ export class ShapeMarkersHelper extends BaseHelper {
   previousPosition: LngLatTuple | null = null;
   activeMarker: MarkerData | null = null;
   activeFeatureData: FeatureData | null = null;
+  initialPoint: SimplePoint | null = null;
+  linkedFeatures: Array<FeatureData> = [];
   sharedMarkers: Array<SharedMarker> = [];
   allowedShapes: Array<FeatureShape> = ['circle', 'line', 'rectangle', 'polygon', 'ellipse'];
   edgeMarkersAllowed: boolean = false;
@@ -136,10 +134,22 @@ export class ShapeMarkersHelper extends BaseHelper {
     this.activeMarker = featureMarkerData || null;
     this.activeFeatureData = featureMarkerData?.instance.parent || null;
 
+    if (this.activeFeatureData) {
+      if (!this.gm.features.selection.has(this.activeFeatureData.id)) {
+        this.gm.features.setSelection([this.activeFeatureData.id]);
+      }
+      const linkedFeatures = this.gm.features.getLinkedFeatures(this.activeFeatureData);
+      if (linkedFeatures.some((f) => f.getShapeProperty('disableEdit') === true)) {
+        return { next: true };
+      }
+      this.linkedFeatures = linkedFeatures;
+    }
+
     if (!(this.activeMarker && this.activeFeatureData)) {
       return { next: true };
     }
 
+    this.initialPoint = event.point;
     this.previousPosition = getFeatureFirstPoint(this.activeMarker.instance);
     this.gm.mapAdapter.setDragPan(false);
 
@@ -155,14 +165,25 @@ export class ShapeMarkersHelper extends BaseHelper {
         this.snappingHelper?.addExcludedFeature(sharedMarker.featureData),
       );
     } else {
-      this.snappingHelper?.addExcludedFeature(this.activeFeatureData);
+      [this.activeFeatureData, ...this.linkedFeatures].map((featureData) => {
+        this.snappingHelper?.addExcludedFeature(featureData);
+      });
     }
 
-    this.sendMarkerEvent('marker_captured', this.activeFeatureData, this.activeMarker);
+    this.sendMarkerEvent(
+      'marker_captured',
+      this.activeFeatureData,
+      this.activeMarker,
+      this.linkedFeatures,
+    );
     return { next: false };
   }
 
-  onMouseUp(): MapHandlerReturnData {
+  onMouseUp(event: BaseMapEvent): MapHandlerReturnData {
+    if (!this.activeFeatureData || !isMapPointerEvent(event, { warning: true })) {
+      return { next: true };
+    }
+
     if (!this.activeMarker) {
       return { next: true };
     }
@@ -170,17 +191,29 @@ export class ShapeMarkersHelper extends BaseHelper {
     const eventData = {
       featureData: this.activeFeatureData,
       markerData: this.activeMarker,
+      linkedFeatures: this.linkedFeatures,
     };
 
+    if (this.initialPoint && this.initialPoint.dist(event.point) < 1) {
+      this.gm.features.setSelection([this.activeFeatureData.id], true);
+    }
+
+    this.initialPoint = null;
     this.activeMarker = null;
     this.activeFeatureData = null;
     this.sharedMarkers = [];
+    this.linkedFeatures = [];
     this.snappingHelper?.clearExcludedFeatures();
     this.previousPosition = null;
     this.gm.mapAdapter.setDragPan(true);
 
     if (eventData.featureData && eventData.markerData) {
-      this.sendMarkerEvent('marker_released', eventData.featureData, eventData.markerData);
+      this.sendMarkerEvent(
+        'marker_released',
+        eventData.featureData,
+        eventData.markerData,
+        eventData.linkedFeatures,
+      );
       return { next: false };
     } else {
       log.debug('ShapeMarkersHelper.onMouseUp: no active marker or featureData', eventData);
@@ -282,17 +315,30 @@ export class ShapeMarkersHelper extends BaseHelper {
       }
 
       this.addCenterMarker(featureData);
-      const shapeSegments = this.getAllShapeSegments(featureData);
 
-      const endMarkerIndexes = this.getEndMarkerIndexes(featureData);
+      let shapeSegments: SegmentData[] | null = null;
+      let useCustomFunction = true;
+
+      let endMarkerIndexes = this.getEndMarkerIndexes(featureData);
+
+      const customGetSegmentsFunc = this.gm.options.settings.customGetAllShapeSegments;
+
+      if (customGetSegmentsFunc) {
+        shapeSegments = customGetSegmentsFunc(featureData);
+      }
+
+      if (!shapeSegments) {
+        useCustomFunction = false;
+        shapeSegments = this.getAllShapeSegments(featureData);
+      } else {
+        endMarkerIndexes = new Set([shapeSegments.length - 1]);
+      }
 
       shapeSegments.forEach((segmentData, index) => {
-        // generic vertex marker
-        const isVertexMarkerAllowed = this.isMarkerIndexAllowed(
-          featureData.shape,
-          index,
-          shapeSegments.length,
-        );
+        const isVertexMarkerAllowed = useCustomFunction
+          ? true
+          : // generic vertex marker
+            this.isMarkerIndexAllowed(featureData.shape, index, shapeSegments.length);
 
         if (isVertexMarkerAllowed) {
           const marker = this.createOrUpdateVertexMarker(segmentData.segment.start, featureData);
@@ -308,7 +354,7 @@ export class ShapeMarkersHelper extends BaseHelper {
         }
 
         // edge middle marker
-        if (this.isEdgeMarkerAllowed(featureData)) {
+        if (!useCustomFunction && this.isEdgeMarkerAllowed(featureData)) {
           const marker = this.createOrUpdateEdgeMarker(segmentData, featureData);
           featureData.markers.set(marker.markerKey, marker.markerData);
         }
@@ -499,17 +545,30 @@ export class ShapeMarkersHelper extends BaseHelper {
       this.activeMarker = this.convertToVertexMarker(this.activeMarker);
     }
 
-    const shapeSegments = this.getAllShapeSegments(featureData);
-    const currentMarkerKeys = new Set(featureData.markers.keys());
+    let shapeSegments: SegmentData[] | null = null;
+    let useCustomFunction = true;
 
-    const endMarkerIndexes = this.getEndMarkerIndexes(featureData);
+    const currentMarkerKeys = new Set(featureData.markers.keys());
+    let endMarkerIndexes = this.getEndMarkerIndexes(featureData);
+
+    const customGetSegmentsFunc = this.gm.options.settings.customGetAllShapeSegments;
+
+    if (customGetSegmentsFunc) {
+      shapeSegments = customGetSegmentsFunc(featureData);
+    }
+
+    if (!shapeSegments) {
+      useCustomFunction = false;
+      shapeSegments = this.getAllShapeSegments(featureData);
+    } else {
+      endMarkerIndexes = new Set([shapeSegments.length - 1]);
+    }
 
     shapeSegments.forEach((segmentData, index) => {
-      const isVertexMarkerAllowed = this.isMarkerIndexAllowed(
-        featureData.shape,
-        index,
-        shapeSegments.length,
-      );
+      const isVertexMarkerAllowed = useCustomFunction
+        ? true
+        : // generic vertex marker
+          this.isMarkerIndexAllowed(featureData.shape, index, shapeSegments.length);
 
       if (isVertexMarkerAllowed) {
         const marker = this.createOrUpdateVertexMarker(segmentData.segment.start, featureData);
@@ -523,7 +582,7 @@ export class ShapeMarkersHelper extends BaseHelper {
         }
       }
 
-      if (this.isEdgeMarkerAllowed(featureData)) {
+      if (!useCustomFunction && this.isEdgeMarkerAllowed(featureData)) {
         const marker = this.createOrUpdateEdgeMarker(segmentData, featureData);
         currentMarkerKeys.delete(marker.markerKey);
       }
@@ -614,6 +673,7 @@ export class ShapeMarkersHelper extends BaseHelper {
     action: GmEditMarkerEvent['action'],
     featureData: FeatureData,
     markerData: MarkerData,
+    linkedFeatures: Array<FeatureData> = [],
   ) {
     const payload: GmEditMarkerEvent = {
       name: `${GM_SYSTEM_PREFIX}:edit:marker`,
@@ -623,6 +683,7 @@ export class ShapeMarkersHelper extends BaseHelper {
       action,
       featureData,
       markerData,
+      linkedFeatures,
     };
     this.gm.events.fire(`${GM_SYSTEM_PREFIX}:edit`, payload);
   }
@@ -642,7 +703,6 @@ export class ShapeMarkersHelper extends BaseHelper {
 
   sendMarkerMoveEvent(event: BaseMapPointerEvent) {
     const markerLngLat = this.gm.markerPointer.marker?.getLngLat() || event.lngLat.toArray();
-
     if (this.activeMarker && this.activeFeatureData) {
       const targetMarkers = this.pinEnabled
         ? this.sharedMarkers
@@ -665,6 +725,7 @@ export class ShapeMarkersHelper extends BaseHelper {
             markerData: item.markerData,
             lngLatStart: this.previousPosition,
             lngLatEnd: markerLngLat,
+            linkedFeatures: item.featureData === this.activeFeatureData ? this.linkedFeatures : [],
           };
           this.gm.events.fire(`${GM_SYSTEM_PREFIX}:edit`, payload);
         }
