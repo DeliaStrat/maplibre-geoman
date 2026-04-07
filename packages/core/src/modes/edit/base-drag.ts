@@ -4,13 +4,19 @@ import { FeatureData } from '@/core/features/feature-data.ts';
 import type { MapHandlerReturnData } from '@/types/events/bus.ts';
 import type { GmSystemEvent } from '@/types/events/index.ts';
 import type { FeatureShape } from '@/types/features.ts';
-import type { GeoJsonShapeFeature, LngLatDiff, SimplePoint } from '@/types/geojson.ts';
+import type { GeoJsonShapeFeature, SimplePoint } from '@/types/geojson.ts';
 import type { LngLatTuple } from '@/types/map/index.ts';
 import type { EditModeName } from '@/types/modes/index.ts';
 import { BaseEdit } from '@/modes/edit/base.ts';
 import { convertToThrottled } from '@/utils/behavior.ts';
-import { getFeatureFirstPoint, getMovedGeoJson } from '@/utils/features.ts';
 import {
+  getFeatureFirstPoint,
+  getMovedGeoJson,
+  getShapeProperties,
+  propertiesValid,
+} from '@/utils/features.ts';
+import {
+  eachCoordinateWithPath,
   getGeoJsonCircle,
   getGeoJsonEllipse,
   getGeoJsonFirstPoint,
@@ -24,7 +30,8 @@ import log from 'loglevel';
 
 type UpdateShapeHandler = (
   featureData: FeatureData,
-  lngLatDiff: LngLatDiff,
+  startLngLat: LngLatTuple,
+  endLngLat: LngLatTuple,
 ) => Promise<GeoJsonShapeFeature | null> | GeoJsonShapeFeature | null;
 
 export abstract class BaseDrag extends BaseEdit {
@@ -70,7 +77,7 @@ export abstract class BaseDrag extends BaseEdit {
     circle_marker: this.moveSource.bind(this),
     text_marker: this.moveSource.bind(this),
     line: this.moveSource.bind(this),
-    rectangle: this.moveSource.bind(this),
+    rectangle: this.moveRectangle.bind(this),
     polygon: this.moveSource.bind(this),
   };
 
@@ -164,15 +171,14 @@ export abstract class BaseDrag extends BaseEdit {
       // see "relatedModes" in options
       const lngLatEnd = this.gm.markerPointer.marker?.getLngLat() || event.lngLat.toArray();
       const lngLatStart = this.previousLngLat ?? lngLatEnd;
-      const lngLatDiff = getLngLatDiff(lngLatStart, lngLatEnd);
 
       this.gm.features.updateManager.beginTransaction('transactional-update', SOURCES.temporary);
 
       for (const fd of this.linkedFeatures) {
-        await this.moveFeature(fd, lngLatDiff);
+        await this.moveFeature(fd, lngLatStart, lngLatEnd);
       }
 
-      const isUpdated = await this.moveFeature(this.featureData, lngLatDiff);
+      const isUpdated = await this.moveFeature(this.featureData, lngLatStart, lngLatEnd);
       this.gm.features.updateManager.commitTransaction(SOURCES.temporary);
 
       if (isUpdated) {
@@ -198,14 +204,14 @@ export abstract class BaseDrag extends BaseEdit {
     }
   }
 
-  async moveFeature(featureData: FeatureData, lngLatDiff: LngLatDiff) {
+  async moveFeature(featureData: FeatureData, startLngLat: LngLatTuple, endLngLat: LngLatTuple) {
     if (!this.flags.actionInProgress) {
       return;
     }
 
     const shapeUpdateMethod = this.getUpdatedGeoJsonHandlers[featureData.shape];
     if (shapeUpdateMethod) {
-      let updatedGeoJson = shapeUpdateMethod(featureData, lngLatDiff);
+      let updatedGeoJson = shapeUpdateMethod(featureData, startLngLat, endLngLat);
       if (updatedGeoJson instanceof Promise) {
         updatedGeoJson = await updatedGeoJson;
       }
@@ -234,59 +240,96 @@ export abstract class BaseDrag extends BaseEdit {
     }
   }
 
-  moveSource(featureData: FeatureData, lngLatDiff: LngLatDiff) {
-    return getMovedGeoJson(featureData, lngLatDiff);
+  moveSource(featureData: FeatureData, startLngLat: LngLatTuple, endLngLat: LngLatTuple) {
+    return getMovedGeoJson(featureData, getLngLatDiff(startLngLat, endLngLat));
   }
 
-  moveEllipse(featureData: FeatureData, lngLatDiff: LngLatDiff): GeoJsonShapeFeature | null {
+  moveRectangle(
+    featureData: FeatureData,
+    startLngLat: LngLatTuple,
+    endLngLat: LngLatTuple,
+  ): GeoJsonShapeFeature | null {
+    if (featureData.shape !== 'rectangle') {
+      log.error('BaseDrag.moveRectangle: invalid shape type', featureData);
+      return null;
+    }
+
+    if (!propertiesValid(featureData.getGeoJson(), 'rectangle')) {
+      // Fallback for legacy rectangles without intrinsic properties
+      log.warn("BaseDrag.moveRectangle: properties aren't valid", featureData);
+      const lngLatDiff = getLngLatDiff(startLngLat, endLngLat);
+      return getMovedGeoJson(featureData, lngLatDiff);
+    }
+
+    const startScreenPoint = this.gm.mapAdapter.project(startLngLat);
+    const endScreenPoint = this.gm.mapAdapter.project(endLngLat);
+
+    const screenPointDiff = [
+      endScreenPoint[0] - startScreenPoint[0],
+      endScreenPoint[1] - startScreenPoint[1],
+    ];
+
+    const featureGeoJson = featureData.getGeoJson();
+
+    eachCoordinateWithPath(featureGeoJson, (position) => {
+      const point = this.gm.mapAdapter.project(position.coordinate);
+      point[0] += screenPointDiff[0];
+      point[1] += screenPointDiff[1];
+
+      // First and last coordinates are the same for rectangles,
+      // so it's safe to assign it again if the last is a reference to the first
+      const lngLat = this.gm.mapAdapter.unproject(point);
+      position.coordinate[0] = lngLat[0];
+      position.coordinate[1] = lngLat[1];
+    });
+
+    return featureGeoJson;
+  }
+
+  moveEllipse(
+    featureData: FeatureData,
+    startLngLat: LngLatTuple,
+    endLngLat: LngLatTuple,
+  ): GeoJsonShapeFeature | null {
     if (featureData.shape !== 'ellipse') {
       log.error('BaseDrag.moveCircle: invalid shape type', featureData);
       return null;
     }
 
-    const oldCenter = featureData.getShapeProperty('center');
-    const xSemiAxis = featureData.getShapeProperty('xSemiAxis');
-    const ySemiAxis = featureData.getShapeProperty('ySemiAxis');
-    const angle = featureData.getShapeProperty('angle');
-
-    if (
-      !Array.isArray(oldCenter) ||
-      typeof xSemiAxis !== 'number' ||
-      typeof ySemiAxis !== 'number' ||
-      typeof angle !== 'number'
-    ) {
-      log.error(
-        'BaseDrag.moveEllipse: missing center, xSemiAxis, ySemiAxis or angle in the featureData',
-        featureData,
-      );
+    const ellipseProperties = getShapeProperties(featureData.getGeoJson(), 'ellipse');
+    if (!ellipseProperties) {
+      log.error('BaseDrag.moveEllipse: wrong properties', featureData.getGeoJson());
       return null;
     }
 
+    const lngLatDiff = getLngLatDiff(startLngLat, endLngLat);
+
     const newCenterCoords: LngLatTuple = [
-      oldCenter[0] + lngLatDiff.lng,
-      oldCenter[1] + lngLatDiff.lat,
+      ellipseProperties.center[0] + lngLatDiff.lng,
+      ellipseProperties.center[1] + lngLatDiff.lat,
     ];
 
     return getGeoJsonEllipse({
       center: newCenterCoords,
-      xSemiAxis,
-      ySemiAxis,
-      angle,
+      xSemiAxis: ellipseProperties.xSemiAxis,
+      ySemiAxis: ellipseProperties.ySemiAxis,
+      angle: ellipseProperties.angle,
     });
   }
 
   async moveCircle(
     featureData: FeatureData,
-    lngLatDiff: LngLatDiff,
+    startLngLat: LngLatTuple,
+    endLngLat: LngLatTuple,
   ): Promise<GeoJsonShapeFeature | null> {
     if (featureData.shape !== 'circle') {
       log.error('BaseDrag.moveCircle: invalid shape type', featureData);
       return null;
     }
 
-    const shapeCenter = featureData.getShapeProperty('center');
-    if (!Array.isArray(shapeCenter)) {
-      log.error('BaseDrag.moveCircle: missing center in the featureData', featureData);
+    const circleProperties = getShapeProperties(featureData.getGeoJson(), 'circle');
+    if (!circleProperties) {
+      log.error('BaseDrag.moveCircle: wrong properties', featureData.getGeoJson());
       return null;
     }
 
@@ -297,15 +340,16 @@ export abstract class BaseDrag extends BaseEdit {
       return null;
     }
 
+    const lngLatDiff = getLngLatDiff(startLngLat, endLngLat);
     const newCenterCoords: LngLatTuple = [
-      shapeCenter[0] + lngLatDiff.lng,
-      shapeCenter[1] + lngLatDiff.lat,
+      circleProperties.center[0] + lngLatDiff.lng,
+      circleProperties.center[1] + lngLatDiff.lat,
     ];
     await featureData.setShapeProperty('center', newCenterCoords);
 
     const circlePolygon = getGeoJsonCircle({
       center: newCenterCoords,
-      radius: this.gm.mapAdapter.getDistance(shapeCenter, circleRimLngLat),
+      radius: this.gm.mapAdapter.getDistance(circleProperties.center, circleRimLngLat),
     });
 
     return {
