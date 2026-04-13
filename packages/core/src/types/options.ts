@@ -11,7 +11,7 @@ import type {
 import type { PartialDeep } from 'type-fest';
 
 import { ACTION_TYPES, MODE_TYPES } from '@/modes/constants.ts';
-import type { GeoJsonShapeFeature, LngLatDiff, SegmentData } from './geojson.ts';
+import type { GeoJsonShapeFeature, SegmentData } from './geojson.ts';
 import type { FeatureData, GmEditMarkerMoveEvent } from '@/main.ts';
 
 export type ModeType = (typeof MODE_TYPES)[number];
