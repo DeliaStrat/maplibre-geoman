@@ -69,7 +69,8 @@ export type GmOptionsData = {
     customVertexUpdateHandler?: (event: GmEditMarkerMoveEvent) => GeoJsonShapeFeature | null;
     customDragHandler?: (
       featureData: FeatureData,
-      lngLatDiff: LngLatDiff,
+      startLngLat: LngLatTuple,
+      endLngLat: LngLatTuple,
     ) => GeoJsonShapeFeature | null;
     customRotateHandler?: (
       event: GmEditMarkerMoveEvent,

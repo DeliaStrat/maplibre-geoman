@@ -214,8 +214,7 @@ export abstract class BaseDrag extends BaseEdit {
     let updatedGeoJson: Promise<GeoJsonShapeFeature | null> | GeoJsonShapeFeature | null = null;
 
     if (customDragHandlerFunc) {
-      const lngLatDiff = getLngLatDiff(startLngLat, endLngLat);
-      updatedGeoJson = customDragHandlerFunc(featureData, lngLatDiff);
+      updatedGeoJson = customDragHandlerFunc(featureData, startLngLat, endLngLat);
     }
 
     if (!updatedGeoJson) {
