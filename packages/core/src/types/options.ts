@@ -48,6 +48,7 @@ export type GmOptionsData = {
      */
     awaitDataUpdatesOnEvents: boolean;
     useDefaultLayers: boolean;
+    useCursorHandlers: boolean;
     useControlsUi: boolean;
     controlsPosition: BaseControlsPosition;
     controlsUiEnabledByDefault: boolean;
