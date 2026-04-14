@@ -74,7 +74,7 @@ export type GmOptionsData = {
     ) => GeoJsonShapeFeature | null;
     customRotateHandler?: (
       event: GmEditMarkerMoveEvent,
-      shapeCentroid: LngLatTuple,
+      shapeCentroid: LngLatTuple | undefined,
     ) => GeoJsonShapeFeature | null;
   };
   layerStyles: typeof defaultLayerStyles;

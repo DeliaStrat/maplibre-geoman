@@ -1,4 +1,4 @@
-import type { FeatureData } from '@/main';
+import { geoJsonPointToLngLat, type FeatureData } from '@/main';
 import type {
   GeoJsonShapeFeature,
   GmEditMarkerMoveEvent,
@@ -11,6 +11,7 @@ import type {
 import type { Feature, Polygon } from 'geojson';
 import { calculateRotationAngle, getSegmentMiddlePosition } from './customShapeUtil';
 import turfDistance from '@turf/distance';
+import centroid from '@turf/centroid';
 
 export type StarProperties = {
   starCenter: LngLatTuple;
@@ -59,7 +60,7 @@ export const starCustomHandlers = {
   },
   rotate: (
     { featureData, lngLatStart, lngLatEnd }: GmEditMarkerMoveEvent,
-    shapeCentroid: LngLatTuple,
+    shapeCentroid: LngLatTuple | undefined,
   ): GeoJsonShapeFeature | null => {
     const featureGeoJson = featureData.getGeoJson();
     const properties = featureGeoJson.properties;
@@ -68,7 +69,8 @@ export const starCustomHandlers = {
       return null;
     }
 
-    const deltaAngle = calculateRotationAngle(shapeCentroid, lngLatStart, lngLatEnd, false);
+    const rotationPivot = shapeCentroid ?? geoJsonPointToLngLat(centroid(featureGeoJson));
+    const deltaAngle = calculateRotationAngle(rotationPivot, lngLatStart, lngLatEnd, false);
 
     const { starCenter, starRadius, starAngle = 0 } = properties as StarProperties;
     if (starCenter === undefined || starRadius === undefined) {
