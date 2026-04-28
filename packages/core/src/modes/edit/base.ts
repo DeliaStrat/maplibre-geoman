@@ -7,6 +7,8 @@ import type {
   GmEditFeatureEditStartEvent,
   GmEditFeatureRemovedEvent,
   GmEditFeatureUpdatedEvent,
+  GmEditFeatureTransformingEvent,
+  GmEditTransformContext,
 } from '@/types/events/edit.ts';
 import type { GmFeatureBeforeUpdateEvent } from '@/types/events/feature.ts';
 import type { GmSystemEvent, NonEmptyArray } from '@/types/events/index.ts';
@@ -173,6 +175,28 @@ export abstract class BaseEdit extends BaseAction {
       sourceFeatures,
       targetFeatures,
       markerData: markerData || null,
+    };
+
+    await this.gm.events.fire(`${GM_SYSTEM_PREFIX}:edit`, payload);
+  }
+
+  async fireFeatureTransformingEvent({
+    forceMode,
+    features,
+    context,
+  }: {
+    forceMode?: EditModeName;
+    features: NonEmptyArray<FeatureData>;
+    context: GmEditTransformContext;
+  }) {
+    const payload: GmEditFeatureTransformingEvent = {
+      name: `${GM_SYSTEM_PREFIX}:edit:feature_transforming`,
+      level: 'system',
+      actionType: 'edit',
+      action: 'feature_transforming',
+      mode: forceMode || this.mode,
+      features,
+      context,
     };
 
     await this.gm.events.fire(`${GM_SYSTEM_PREFIX}:edit`, payload);

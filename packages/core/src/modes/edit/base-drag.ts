@@ -178,6 +178,15 @@ export abstract class BaseDrag extends BaseEdit {
 
       if (isUpdated) {
         this.previousLngLat = lngLatEnd;
+        await this.fireFeatureTransformingEvent({
+          features: [this.featureData, ...this.linkedFeatures],
+          context: {
+            mode: 'drag',
+            featureData: this.featureData,
+            lngLatStart,
+            lngLatEnd,
+          },
+        });
       }
     }
     return { next: false };

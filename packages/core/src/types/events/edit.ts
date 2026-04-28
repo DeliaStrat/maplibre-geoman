@@ -63,6 +63,29 @@ export interface GmEditFeatureUpdatedEvent extends GmBaseEvent {
   markerData: MarkerData | null;
 }
 
+export type GmEditTransformContext =
+  | {
+      mode: 'drag';
+      featureData: FeatureData;
+      lngLatStart: LngLatTuple;
+      lngLatEnd: LngLatTuple;
+    }
+  | {
+      mode: 'rotate';
+      featureData: FeatureData;
+      shapeCentroid: LngLatTuple | undefined;
+      event: GmEditMarkerMoveEvent;
+    };
+
+export interface GmEditFeatureTransformingEvent extends GmBaseEvent {
+  name: `${GmSystemPrefix}:edit:feature_transforming`;
+  actionType: 'edit';
+  mode: EditModeName;
+  action: 'feature_transforming';
+  features: NonEmptyArray<FeatureData>;
+  context: GmEditTransformContext;
+}
+
 export interface GmEditFeatureEditStartEvent extends GmBaseEvent {
   // fired when a long action is supposed for a mode
   // examples: edit:change, edit:rotate, edit: scale
@@ -96,6 +119,7 @@ export type GmEditEvent =
   | GmEditMarkerEvent
   | GmEditMarkerMoveEvent
   | GmEditFeatureUpdatedEvent
+  | GmEditFeatureTransformingEvent
   | GmEditFeatureEditStartEvent
   | GmEditFeatureEditEndEvent
   | GmEditFeatureRemovedEvent
