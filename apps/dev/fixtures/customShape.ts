@@ -1,8 +1,9 @@
-import { geoJsonPointToLngLat, type FeatureData } from '@/main';
+import { geoJsonPointToLngLat, getLngLatDiff, type FeatureData } from '@/main';
 import type {
   GeoJsonShapeFeature,
-  GmEditMarkerMoveEvent,
-  LngLatDiff,
+  GmCustomDragHandlerContext,
+  GmCustomRotateHandlerContext,
+  GmCustomVertexHandlerContext,
   LngLatTuple,
   PositionData,
   SegmentData,
@@ -58,10 +59,12 @@ export const starCustomHandlers = {
 
     return segmentsData;
   },
-  rotate: (
-    { featureData, lngLatStart, lngLatEnd }: GmEditMarkerMoveEvent,
-    shapeCentroid: LngLatTuple | undefined,
-  ): GeoJsonShapeFeature | null => {
+  rotate: ({
+    featureData,
+    lngLatStart,
+    lngLatEnd,
+    shapeCentroid,
+  }: GmCustomRotateHandlerContext): GeoJsonShapeFeature | null => {
     const featureGeoJson = featureData.getGeoJson();
     const properties = featureGeoJson.properties;
 
@@ -89,7 +92,10 @@ export const starCustomHandlers = {
       },
     };
   },
-  vertexUpdate: ({ featureData, lngLatEnd }: GmEditMarkerMoveEvent): GeoJsonShapeFeature | null => {
+  vertexUpdate: ({
+    featureData,
+    lngLatEnd,
+  }: GmCustomVertexHandlerContext): GeoJsonShapeFeature | null => {
     const featureGeoJson = featureData.getGeoJson();
     const properties = featureGeoJson.properties;
 
@@ -117,7 +123,13 @@ export const starCustomHandlers = {
       },
     };
   },
-  drag: (featureData: FeatureData, lngLatDiff: LngLatDiff): GeoJsonShapeFeature | null => {
+  drag: ({
+    featureData,
+    startLngLat,
+    endLngLat,
+  }: GmCustomDragHandlerContext): GeoJsonShapeFeature | null => {
+    const lngLatDiff = getLngLatDiff(startLngLat, endLngLat);
+
     const featureGeoJson = featureData.getGeoJson();
     const properties = featureGeoJson.properties;
 

@@ -34,34 +34,34 @@ export function createGmOptions(): PartialDeep<GmOptionsData> {
 
         return null;
       },
-      customRotateHandler(event, shapeCentroid) {
-        const featureGeoJson = event.featureData.getGeoJson();
+      customRotateHandler(context) {
+        const featureGeoJson = context.featureData.getGeoJson();
 
         switch (featureGeoJson.properties.customShape) {
           case 'star': {
-            return starCustomHandlers.rotate(event, shapeCentroid);
+            return starCustomHandlers.rotate(context);
           }
         }
 
         return null;
       },
-      customVertexUpdateHandler(event) {
-        const featureGeoJson = event.featureData.getGeoJson();
+      customVertexUpdateHandler(context) {
+        const featureGeoJson = context.featureData.getGeoJson();
 
         switch (featureGeoJson.properties.customShape) {
           case 'star': {
-            return starCustomHandlers.vertexUpdate(event);
+            return starCustomHandlers.vertexUpdate(context);
           }
         }
 
         return null;
       },
-      customDragHandler(featureData, lngLatDiff) {
-        const featureGeoJson = featureData.getGeoJson();
+      customDragHandler(context) {
+        const featureGeoJson = context.featureData.getGeoJson();
 
         switch (featureGeoJson.properties.customShape) {
           case 'star': {
-            return starCustomHandlers.drag(featureData, lngLatDiff);
+            return starCustomHandlers.drag(context);
           }
         }
 

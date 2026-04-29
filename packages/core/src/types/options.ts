@@ -7,12 +7,13 @@ import type {
   DrawModeName,
   EditModeName,
   HelperModeName,
+  MarkerData,
 } from '@/types/modes/index.ts';
 import type { PartialDeep } from 'type-fest';
 
 import { ACTION_TYPES, MODE_TYPES } from '@/modes/constants.ts';
 import type { GeoJsonShapeFeature, SegmentData } from './geojson.ts';
-import type { FeatureData, GmEditMarkerMoveEvent } from '@/main.ts';
+import type { FeatureData } from '@/main.ts';
 
 export type ModeType = (typeof MODE_TYPES)[number];
 export type ActionType = (typeof ACTION_TYPES)[number];
@@ -66,16 +67,11 @@ export type GmOptionsData = {
       control: string;
     };
     customGetAllShapeSegments?: (featureData: FeatureData) => SegmentData[] | null;
-    customVertexUpdateHandler?: (event: GmEditMarkerMoveEvent) => GeoJsonShapeFeature | null;
-    customDragHandler?: (
-      featureData: FeatureData,
-      startLngLat: LngLatTuple,
-      endLngLat: LngLatTuple,
+    customVertexUpdateHandler?: (
+      context: GmCustomVertexHandlerContext,
     ) => GeoJsonShapeFeature | null;
-    customRotateHandler?: (
-      event: GmEditMarkerMoveEvent,
-      shapeCentroid: LngLatTuple | undefined,
-    ) => GeoJsonShapeFeature | null;
+    customDragHandler?: (context: GmCustomDragHandlerContext) => GeoJsonShapeFeature | null;
+    customRotateHandler?: (context: GmCustomRotateHandlerContext) => GeoJsonShapeFeature | null;
   };
   layerStyles: typeof defaultLayerStyles;
   controls: {
@@ -87,4 +83,22 @@ export type GmOptionsData = {
 export type GmOptionsPartial = PartialDeep<GmOptionsData>;
 export type GenericControlsOptions = {
   [key in ModeName]?: ControlOptions;
+};
+
+export type GmCustomVertexHandlerContext = {
+  featureData: FeatureData;
+  markerData: MarkerData;
+  lngLatStart: LngLatTuple;
+  lngLatEnd: LngLatTuple;
+};
+export type GmCustomDragHandlerContext = {
+  featureData: FeatureData;
+  startLngLat: LngLatTuple;
+  endLngLat: LngLatTuple;
+};
+export type GmCustomRotateHandlerContext = {
+  featureData: FeatureData;
+  lngLatStart: LngLatTuple;
+  lngLatEnd: LngLatTuple;
+  shapeCentroid: LngLatTuple | undefined;
 };

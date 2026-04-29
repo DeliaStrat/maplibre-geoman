@@ -121,7 +121,12 @@ export class EditRotate extends BaseDrag {
 
       if (customRotateHandlerFunc) {
         // if we iterate groupFeature.length > 1 and shapeCentroid is not undefined
-        updatedGeoJson = customRotateHandlerFunc(event, shapeCentroid!);
+        updatedGeoJson = customRotateHandlerFunc({
+          featureData,
+          lngLatStart: event.lngLatStart,
+          lngLatEnd: event.lngLatEnd,
+          shapeCentroid,
+        });
       }
 
       if (!updatedGeoJson) {
