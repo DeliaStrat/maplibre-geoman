@@ -548,6 +548,10 @@ export const getGeoJsonCircle = ({
   const circleGeoJson = turfCircle(center, radius, {
     steps,
     units: 'meters',
+    properties: {
+      shape: 'circle',
+      center: center,
+    },
   });
 
   // remove link between first and last coordinates
