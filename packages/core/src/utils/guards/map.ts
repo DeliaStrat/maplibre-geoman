@@ -55,7 +55,11 @@ export const isMapPointerEvent = (
     log.warn('Not a pointer event', event);
   }
 
-  return isCursorEvent;
+  return (
+    isCursorEvent &&
+    (typeof (event.originalEvent as any)?.button !== 'number' ||
+      (event.originalEvent as any).button === 0)
+  );
 };
 
 export const isMapMouseEvent = (
